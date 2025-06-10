@@ -61,8 +61,7 @@ export class AuthService {
         }
 
         const payload = { 
-            sub: telegramId,
-            walletId: userWallet.id
+            uw_id: userWallet.id,
         };
         
         const accessToken = this.jwtService.sign(payload);
@@ -72,16 +71,12 @@ export class AuthService {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 24 * 60 * 60 * 1000, // 24 hours
+            maxAge: parseInt(process.env.COOKIE_EXPIRES_IN) * 1000,
         });
 
         return {
             success: true,
             message: 'Login successful',
-            data: {
-                walletId: userWallet.id,
-                isNewWallet: !userWallet.sol_address
-            }
         };
     }
 
@@ -92,5 +87,17 @@ export class AuthService {
         } catch (error) {
             return null;
         }
+    }
+
+    async logout(response: Response) {
+        response.clearCookie('access_token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict'
+        });
+        return {
+            success: true,
+            message: 'Logout successful'
+        };
     }
 }

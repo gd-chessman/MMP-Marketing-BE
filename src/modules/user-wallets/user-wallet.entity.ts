@@ -1,8 +1,8 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, BeforeInsert } from 'typeorm';
 
 @Entity('user_wallets')
 export class UserWallet {
-  @PrimaryGeneratedColumn()
+  @Column({ type: 'bigint', primary: true })
   id: number;
 
   @Column({ type: 'varchar' })
@@ -31,4 +31,14 @@ export class UserWallet {
 
   @CreateDateColumn()
   created_at: Date;
+
+  @BeforeInsert()
+  generateId() {
+    // Generate random number between 1000-9999
+    const random = Math.floor(Math.random() * (9999 - 1000 + 1)) + 1000;
+    // Get current timestamp in seconds and take last 8 digits
+    const timestamp = Math.floor(Date.now() / 1000).toString().slice(-8);
+    // Combine random number and timestamp
+    this.id = parseInt(`${random}${timestamp}`);
+  }
 } 

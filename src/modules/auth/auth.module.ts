@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { TelegramCodes } from '../telegram_codes/telegram-codes.entity';
 import { UserWallet } from '../user-wallets/user-wallet.entity';
+import { JwtUserWalletStrategy } from './jwt-user-wallet.strategy';
 
 @Module({
     imports: [
@@ -14,13 +15,13 @@ import { UserWallet } from '../user-wallets/user-wallet.entity';
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({
                 secret: configService.get<string>('JWT_SECRET'),
-                signOptions: { expiresIn: '24h' },
+                signOptions: { expiresIn: configService.get<string>('JWT_EXPIRES_IN') },
             }),
             inject: [ConfigService],
         }),
     ],
     controllers: [AuthController],
-    providers: [AuthService],
+    providers: [AuthService, JwtUserWalletStrategy],
     exports: [AuthService],
 })
 export class AuthModule {}
