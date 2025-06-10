@@ -5,6 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TelegramCodes } from '../telegram_codes/telegram-codes.entity';
 import { UserWallet } from '../user-wallets/user-wallet.entity';
+import { Keypair } from '@solana/web3.js';
+import bs58 from 'bs58';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +17,14 @@ export class AuthService {
         @InjectRepository(UserWallet)
         private userWalletRepository: Repository<UserWallet>,
     ) {}
+
+    private generateSolanaWallet() {
+        const keypair = Keypair.generate();
+        return {
+            publicKey: keypair.publicKey.toBase58(),
+            privateKey: bs58.encode(keypair.secretKey)
+        };
+    }
 
     async login(telegramId: string, code: string, res: Response) {
         if (!telegramId || !code) {
@@ -50,12 +60,11 @@ export class AuthService {
 
         // Create new user wallet if not exists
         if (!userWallet) {
+            const solanaWallet = this.generateSolanaWallet();
             userWallet = this.userWalletRepository.create({
                 telegram_id: telegramId,
-                email: '', // Temporary email
-                sol_address: '', // Will be updated later
-                private_key: '', // Will be updated later
-                isActiveMail: false
+                sol_address: solanaWallet.publicKey,
+                private_key: solanaWallet.privateKey,
             });
             await this.userWalletRepository.save(userWallet);
         }

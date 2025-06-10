@@ -1,18 +1,22 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, BeforeInsert } from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 @Entity('user_wallets')
 export class UserWallet {
   @Column({ type: 'bigint', primary: true })
   id: number;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', nullable: true })
   email: string;
+
+  @Column({ type: 'boolean', default: false })
+  is_verified_email: boolean;
 
   @Column({ type: 'varchar', nullable: true })
   gg_auth: string;
 
-  @Column({ type: 'boolean', default: false })
-  isActiveMail: boolean;
+  @Column({ default: false })
+  is_verified_gg_auth: boolean;
 
   @Column({ type: 'varchar', nullable: true })
   telegram_id: string;
@@ -20,6 +24,7 @@ export class UserWallet {
   @Column({ type: 'varchar' })
   sol_address: string;
 
+  @Exclude()
   @Column({ type: 'text' })
   private_key: string;
 
