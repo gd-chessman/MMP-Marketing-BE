@@ -7,6 +7,7 @@ import axios from 'axios';
 export class TelegramBotService implements OnModuleInit {
     private botToken: string;
     private workerUrl: string;
+    private frontendUrl: string;
     private readonly logger = new Logger(TelegramBotService.name);
     private lastUpdateId: number = 0;
     private isPolling: boolean = false;
@@ -17,9 +18,13 @@ export class TelegramBotService implements OnModuleInit {
     ) {
         this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN', '');
         this.workerUrl = this.configService.get<string>('URL_WORKER', 'https://proxy.michosso2025.workers.dev');
+        this.frontendUrl = this.configService.get<string>('FRONTEND_URL_TELE');
 
         if (!this.botToken) {
             throw new Error('TELEGRAM_BOT_TOKEN is missing in .env file');
+        }
+        if (!this.frontendUrl) {
+            throw new Error('FRONTEND_URL_TELE is missing in .env file');
         }
     }
 
@@ -73,16 +78,20 @@ export class TelegramBotService implements OnModuleInit {
                 const code = await this.telegramCodesService.generateCode(telegramId);
                 
                 const message = `
-⭐️ *Welcome to Telegram Code Service* 🤘
+⭐️ *Welcome to MemePump Marketing* 🤘
 
-Your verification code is: *${code}*
-This code will expire in 10 minutes.
+Please click the button below to login.
+This link will expire in 10 minutes.`;
 
-Please use this code to verify your account.
-                `;
+                const keyboard = {
+                    inline_keyboard: [
+                        [{ text: '🌐 Login Website', url: `${this.frontendUrl}/tglogin?id=${telegramId}&code=${code}` }],
+                    ],
+                };
 
                 await this.sendMessage(chatId, message, {
-                    parse_mode: 'Markdown'
+                    parse_mode: 'Markdown',
+                    reply_markup: keyboard
                 });
                 
             } catch (error) {

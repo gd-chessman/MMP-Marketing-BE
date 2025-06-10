@@ -19,8 +19,4 @@ export class UserWalletsService {
   async findAll(): Promise<UserWallet[]> {
     return await this.userWalletRepository.find();
   }
-
-  async findOne(id: string): Promise<UserWallet> {
-    return await this.userWalletRepository.findOne({ where: { id } });
-  }
 } 

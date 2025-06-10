@@ -17,8 +17,4 @@ export class UserWalletsController {
     return this.userWalletsService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string): Promise<UserWallet> {
-    return this.userWalletsService.findOne(id);
-  }
 }

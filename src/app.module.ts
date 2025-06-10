@@ -8,6 +8,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserWalletsModule } from './modules/user-wallets/user-wallets.module';
 import { TelegramCodesModule } from './modules/telegram_codes/telegram-codes.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 
 
@@ -20,6 +21,7 @@ import { TelegramCodesModule } from './modules/telegram_codes/telegram-codes.mod
       inject: [ConfigService],
     }),
     UserWalletsModule,
+    AuthModule,
     TelegramCodesModule,
   ],
   controllers: [AppController], // Các controller của ứng dụng

@@ -56,15 +56,6 @@ export class TelegramCodesService {
                 now.getUTCMinutes() + 10,
                 now.getUTCSeconds()
             ));
-
-            this.logger.debug('Generating new code:', {
-                code,
-                nowUTC: now.toISOString(),
-                expirationTimeUTC: expiresAt.toISOString(),
-                nowLocal: now.toString(),
-                expirationTimeLocal: expiresAt.toString()
-            });
-
             // Tạo bản ghi mới trong database
             const telegramCode = this.telegramCodesRepository.create({
                 code,
@@ -74,7 +65,6 @@ export class TelegramCodesService {
             });
 
             await this.telegramCodesRepository.save(telegramCode);
-            this.logger.log(`Generated new code for user ${telegramId}: ${code}`);
 
             return code;
         } catch (error) {
