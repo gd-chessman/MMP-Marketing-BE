@@ -2,12 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
-import { DatabaseExceptionFilter } from './exceptions/database-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.useGlobalFilters(new DatabaseExceptionFilter());
-
   const configService = app.get(ConfigService);
 
   // Lấy danh sách các domain từ biến môi trường, nếu không thì mặc định là localhost
@@ -15,7 +12,7 @@ async function bootstrap() {
     .get<string>('FRONTEND_URLS')
     .split(','); // Tách các URL nếu có nhiều hơn 1 domain
 
-  const port = configService.get<number>('APP_PORT', 8080);
+  const port = configService.get<number>('APP_PORT', 8000);
 
   // Cấu hình CORS hỗ trợ subdomain
   app.enableCors({
@@ -39,6 +36,11 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: 'Content-Type, Accept',
     credentials: true, // Cho phép cookie
+  });
+
+  // Set global prefix
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['/', 'admin/*'],
   });
 
   app.use(cookieParser());
