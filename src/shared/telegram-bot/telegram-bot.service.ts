@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TelegramCodeService } from './telegram-code.service';
+import { TelegramCodeService } from '../../modules/telegram_codes/telegram-code.service';
 import axios from 'axios';
 
 @Injectable()

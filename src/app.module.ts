@@ -9,6 +9,7 @@ import { AppService } from './app.service';
 import { UserWalletModule } from './modules/user-wallets/user-wallet.module';
 import { TelegramCodeModule } from './modules/telegram_codes/telegram-code.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { SharedModule } from './shared/shared.module';
 
 
 
@@ -23,6 +24,7 @@ import { AuthModule } from './modules/auth/auth.module';
     UserWalletModule,
     AuthModule,
     TelegramCodeModule,
+    SharedModule,
   ],
   controllers: [AppController], // Các controller của ứng dụng
   providers: [AppService]
