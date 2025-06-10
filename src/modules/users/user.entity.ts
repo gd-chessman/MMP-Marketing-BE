@@ -1,10 +1,18 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, BeforeInsert } from 'typeorm';
-import { Exclude } from 'class-transformer';
 
-@Entity('user_wallets')
-export class UserWallet {
+export enum Role {
+  ADMIN = 1,
+  MEMBER = 2,
+  GUEST = 3
+}
+
+@Entity('users')
+export class User {
   @Column({ type: 'bigint', primary: true })
   id: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  full_name: string;
 
   @Column({ type: 'varchar', nullable: true })
   email: string;
@@ -21,18 +29,8 @@ export class UserWallet {
   @Column({ type: 'varchar', nullable: true })
   telegram_id: string;
 
-  @Column({ type: 'varchar' })
-  sol_address: string;
-
-  @Exclude()
-  @Column({ type: 'text' })
-  private_key: string;
-
-  @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
-  balance_sol: number;
-
-  @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
-  balance_mmp: number;
+  @Column({ type: 'enum', enum: Role, default: Role.GUEST })
+  role: Role;
 
   @CreateDateColumn()
   created_at: Date;

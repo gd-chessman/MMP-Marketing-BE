@@ -1,0 +1,32 @@
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, BeforeInsert, ManyToOne, JoinColumn } from 'typeorm';
+import { Exclude } from 'class-transformer';
+import { User } from '../users/user.entity';
+
+@Entity('wallets')
+export class Wallet {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ type: 'bigint' })
+  user_id: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'user_id' })
+  user: User;
+
+  @Column({ type: 'varchar' })
+  sol_address: string;
+
+  @Exclude()
+  @Column({ type: 'text' })
+  private_key: string;
+
+  @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
+  balance_sol: number;
+
+  @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
+  balance_mmp: number;
+
+  @CreateDateColumn()
+  created_at: Date;
+} 

@@ -6,7 +6,8 @@ import { databaseConfig } from './config/database.config';
 import { appConfig } from './config/app.config';  // Import file config
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { UserWalletModule } from './modules/user-wallets/user-wallet.module';
+import { UserModule } from './modules/users/user.module';
+import { WalletModule } from './modules/wallets/wallet.module';
 import { TelegramCodeModule } from './modules/telegram_codes/telegram-code.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SharedModule } from './shared/shared.module';
@@ -21,7 +22,8 @@ import { SharedModule } from './shared/shared.module';
       useFactory: (configService: ConfigService) => databaseConfig(configService),
       inject: [ConfigService],
     }),
-    UserWalletModule,
+    UserModule,
+    WalletModule,
     AuthModule,
     TelegramCodeModule,
     SharedModule,

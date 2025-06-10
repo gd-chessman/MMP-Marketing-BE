@@ -5,12 +5,16 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { TelegramCode } from '../telegram_codes/telegram-code.entity';
-import { UserWallet } from '../user-wallets/user-wallet.entity';
-import { JwtUserWalletStrategy } from './jwt-user-wallet.strategy';
+import { User } from '../users/user.entity';
+import { Wallet } from '../wallets/wallet.entity';
+import { JwtAdminGuard } from './jwt-admin.guard';
+import { JwtGuestGuard } from './jwt-guest.guard';
+import { JwtAdminStrategy } from './jwt-admin.strategy';
+import { JwtGuestStrategy } from './jwt-guest.strategy';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([TelegramCode, UserWallet]),
+        TypeOrmModule.forFeature([TelegramCode, User, Wallet]),
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({
@@ -21,7 +25,13 @@ import { JwtUserWalletStrategy } from './jwt-user-wallet.strategy';
         }),
     ],
     controllers: [AuthController],
-    providers: [AuthService, JwtUserWalletStrategy],
+    providers: [
+        AuthService, 
+        JwtAdminStrategy,
+        JwtGuestStrategy,
+        JwtAdminGuard,
+        JwtGuestGuard
+    ],
     exports: [AuthService],
 })
 export class AuthModule {}

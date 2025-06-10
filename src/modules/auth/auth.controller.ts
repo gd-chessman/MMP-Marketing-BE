@@ -1,7 +1,6 @@
 import { Controller, Post, Body, Res, HttpStatus, HttpCode, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
-import { JwtAuthUserWalletGuard } from './jwt-auth-user-wallet.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -17,7 +16,6 @@ export class AuthController {
     }
 
     @Post('logout')
-    @UseGuards(JwtAuthUserWalletGuard)
     async logout(@Res({ passthrough: true }) response: Response) {
       return this.authService.logout(response);
     }

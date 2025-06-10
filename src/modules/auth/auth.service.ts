@@ -4,9 +4,11 @@ import { Response } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TelegramCode } from '../telegram_codes/telegram-code.entity';
-import { UserWallet } from '../user-wallets/user-wallet.entity';
+import { User } from '../users/user.entity';
+import { Wallet } from '../wallets/wallet.entity';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
+import { Role } from '../users/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -14,8 +16,10 @@ export class AuthService {
         private jwtService: JwtService,
         @InjectRepository(TelegramCode)
         private telegramCodesRepository: Repository<TelegramCode>,
-        @InjectRepository(UserWallet)
-        private userWalletRepository: Repository<UserWallet>,
+        @InjectRepository(User)
+        private userRepository: Repository<User>,
+        @InjectRepository(Wallet)
+        private walletRepository: Repository<Wallet>,
     ) {}
 
     private generateSolanaWallet() {
@@ -53,24 +57,39 @@ export class AuthService {
         telegramCode.is_used = true;
         await this.telegramCodesRepository.save(telegramCode);
 
-        // Check if user wallet exists
-        let userWallet = await this.userWalletRepository.findOne({
+        // Check if user exists
+        let user = await this.userRepository.findOne({
             where: { telegram_id: telegramId }
         });
 
-        // Create new user wallet if not exists
-        if (!userWallet) {
-            const solanaWallet = this.generateSolanaWallet();
-            userWallet = this.userWalletRepository.create({
+        // Create new user if not exists
+        if (!user) {
+            user = this.userRepository.create({
                 telegram_id: telegramId,
+                role: Role.GUEST // Set default role as GUEST for new users
+            });
+            await this.userRepository.save(user);
+        }
+
+        // Check if wallet exists for user
+        let wallet = await this.walletRepository.findOne({
+            where: { user_id: user.id }
+        });
+
+        // Create new wallet if not exists
+        if (!wallet) {
+            const solanaWallet = this.generateSolanaWallet();
+            wallet = this.walletRepository.create({
+                user_id: user.id,
                 sol_address: solanaWallet.publicKey,
                 private_key: solanaWallet.privateKey,
             });
-            await this.userWalletRepository.save(userWallet);
+            await this.walletRepository.save(wallet);
         }
 
         const payload = { 
-            uw_id: userWallet.id,
+            user_id: user.id,
+            role: user.role
         };
         
         const accessToken = this.jwtService.sign(payload);
