@@ -6,6 +6,7 @@ import { databaseConfig } from './config/database.config';
 import { appConfig } from './config/app.config';  // Import file config
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { UserWalletsModule } from './modules/user-wallets/user-wallets.module';
 
 
 
@@ -17,6 +18,7 @@ import { AppService } from './app.service';
       useFactory: (configService: ConfigService) => databaseConfig(configService),
       inject: [ConfigService],
     }),
+    UserWalletsModule,
   ],
   controllers: [AppController], // Các controller của ứng dụng
   providers: [AppService]

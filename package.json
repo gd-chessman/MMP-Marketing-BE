@@ -37,6 +37,7 @@
     "@nestjs/websockets": "^10.4.10",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
+    "class-validator": "^0.14.2",
     "cloudinary": "^1.41.3",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.5",
