@@ -21,5 +21,4 @@ export class UserWalletsController {
   findOne(@Param('id') id: string): Promise<UserWallet> {
     return this.userWalletsService.findOne(id);
   }
-
-} 
+}
