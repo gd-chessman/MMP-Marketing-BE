@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -13,6 +14,12 @@ async function bootstrap() {
     .split(','); // Tách các URL nếu có nhiều hơn 1 domain
 
   const port = configService.get<number>('APP_PORT', 8000);
+
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    transform: true,
+    forbidNonWhitelisted: false,
+  }));
 
   // Cấu hình CORS hỗ trợ subdomain
   app.enableCors({
