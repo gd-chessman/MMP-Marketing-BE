@@ -6,8 +6,8 @@ import { databaseConfig } from './config/database.config';
 import { appConfig } from './config/app.config';  // Import file config
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { UserWalletsModule } from './modules/user-wallets/user-wallets.module';
-import { TelegramCodesModule } from './modules/telegram_codes/telegram-codes.module';
+import { UserWalletModule } from './modules/user-wallets/user-wallet.module';
+import { TelegramCodeModule } from './modules/telegram_codes/telegram-code.module';
 import { AuthModule } from './modules/auth/auth.module';
 
 
@@ -20,9 +20,9 @@ import { AuthModule } from './modules/auth/auth.module';
       useFactory: (configService: ConfigService) => databaseConfig(configService),
       inject: [ConfigService],
     }),
-    UserWalletsModule,
+    UserWalletModule,
     AuthModule,
-    TelegramCodesModule,
+    TelegramCodeModule,
   ],
   controllers: [AppController], // Các controller của ứng dụng
   providers: [AppService]

@@ -4,13 +4,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { TelegramCodes } from '../telegram_codes/telegram-codes.entity';
+import { TelegramCode } from '../telegram_codes/telegram-code.entity';
 import { UserWallet } from '../user-wallets/user-wallet.entity';
 import { JwtUserWalletStrategy } from './jwt-user-wallet.strategy';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([TelegramCodes, UserWallet]),
+        TypeOrmModule.forFeature([TelegramCode, UserWallet]),
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({

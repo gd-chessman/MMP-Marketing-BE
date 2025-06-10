@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TelegramCodesService } from './telegram-codes.service';
+import { TelegramCodeService } from './telegram-code.service';
 import axios from 'axios';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class TelegramBotService implements OnModuleInit {
 
     constructor(
         private configService: ConfigService,
-        private readonly telegramCodesService: TelegramCodesService,
+        private readonly telegramCodesService: TelegramCodeService,
     ) {
         this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN', '');
         this.workerUrl = this.configService.get<string>('URL_WORKER', 'https://proxy.michosso2025.workers.dev');

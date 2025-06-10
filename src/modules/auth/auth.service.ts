@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TelegramCodes } from '../telegram_codes/telegram-codes.entity';
+import { TelegramCode } from '../telegram_codes/telegram-code.entity';
 import { UserWallet } from '../user-wallets/user-wallet.entity';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
@@ -12,8 +12,8 @@ import bs58 from 'bs58';
 export class AuthService {
     constructor(
         private jwtService: JwtService,
-        @InjectRepository(TelegramCodes)
-        private telegramCodesRepository: Repository<TelegramCodes>,
+        @InjectRepository(TelegramCode)
+        private telegramCodesRepository: Repository<TelegramCode>,
         @InjectRepository(UserWallet)
         private userWalletRepository: Repository<UserWallet>,
     ) {}

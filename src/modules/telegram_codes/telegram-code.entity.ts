@@ -1,7 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
 
 @Entity('telegram_codes')
-export class TelegramCodes {
+export class TelegramCode {
   @PrimaryGeneratedColumn()
   id: number;
 

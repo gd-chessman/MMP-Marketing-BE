@@ -2,21 +2,21 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TelegramCodes } from './telegram-codes.entity';
+import { TelegramCode } from './telegram-code.entity';
 import { randomBytes } from 'crypto';
 import axios from 'axios';
 import { MoreThan } from 'typeorm';
 
 @Injectable()
-export class TelegramCodesService {
+export class TelegramCodeService {
     private workerUrl: string;
     private botToken: string;
-    private readonly logger = new Logger(TelegramCodesService.name);
+    private readonly logger = new Logger(TelegramCodeService.name);
 
     constructor(
         private configService: ConfigService,
-        @InjectRepository(TelegramCodes)
-        private telegramCodesRepository: Repository<TelegramCodes>,
+        @InjectRepository(TelegramCode)
+        private telegramCodesRepository: Repository<TelegramCode>,
     ) {
         this.workerUrl = this.configService.get<string>('URL_WORKER', 'https://proxy.michosso2025.workers.dev');
         this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN', '');
@@ -103,7 +103,7 @@ export class TelegramCodesService {
         }
     }
 
-    async getActiveCode(telegramId: string): Promise<TelegramCodes | null> {
+    async getActiveCode(telegramId: string): Promise<TelegramCode | null> {
         try {
             return await this.telegramCodesRepository.findOne({
                 where: {
