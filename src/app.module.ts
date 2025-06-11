@@ -11,8 +11,7 @@ import { WalletModule } from './modules/wallets/wallet.module';
 import { VerifyCodeModule } from './modules/verify-codes/verify-code.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SharedModule } from './shared/shared.module';
-
-
+import { SwapOrderModule } from './modules/swap-orders/swap-order.module';
 
 @Module({
   imports: [
@@ -27,6 +26,7 @@ import { SharedModule } from './shared/shared.module';
     AuthModule,
     VerifyCodeModule,
     SharedModule,
+    SwapOrderModule,
   ],
   controllers: [AppController], // Các controller của ứng dụng
   providers: [AppService]
