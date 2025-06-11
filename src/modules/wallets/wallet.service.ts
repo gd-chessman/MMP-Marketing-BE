@@ -12,4 +12,7 @@ export class WalletService {
     private userService: UserService,
   ) {}
 
+  async findOne(id: number): Promise<Wallet> {
+    return this.walletRepository.findOne({ where: { id } });
+  }
 } 
