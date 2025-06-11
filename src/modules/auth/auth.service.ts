@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -8,11 +8,16 @@ import { User } from '../users/user.entity';
 import { Wallet } from '../wallets/wallet.entity';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
+import { GoogleLoginDto, LoginResponse } from './dto/auth.dto';
+import { GoogleAuthService } from './google-auth.service';
 
 @Injectable()
 export class AuthService {
+    private readonly logger = new Logger(AuthService.name);
+
     constructor(
         private jwtService: JwtService,
+        private googleAuthService: GoogleAuthService,
         @InjectRepository(TelegramCode)
         private telegramCodesRepository: Repository<TelegramCode>,
         @InjectRepository(User)
@@ -29,7 +34,7 @@ export class AuthService {
         };
     }
 
-    async login(telegramId: string, code: string, res: Response) {
+    async handleTelegramLogin(telegramId: string, code: string, res: Response) {
         if (!telegramId || !code) {
             throw new BadRequestException('Telegram ID and code are required');
         }
@@ -105,14 +110,14 @@ export class AuthService {
         };
     }
 
-    async validateToken(token: string) {
-        try {
-            const payload = await this.jwtService.verify(token);
-            return payload;
-        } catch (error) {
-            return null;
-        }
-    }
+    // async validateToken(token: string) {
+    //     try {
+    //         const payload = await this.jwtService.verify(token);
+    //         return payload;
+    //     } catch (error) {
+    //         return null;
+    //     }
+    // }
 
     async logout(response: Response) {
         response.clearCookie('access_token', {
@@ -124,5 +129,77 @@ export class AuthService {
             success: true,
             message: 'Logout successful'
         };
+    }
+
+    async handleGoogleLogin(loginData: GoogleLoginDto, res: Response): Promise<LoginResponse> {
+        try {
+            this.logger.debug('Starting Google login process with code:', {
+                codeLength: loginData.code.length,
+                codePrefix: loginData.code.substring(0, 10) + '...'
+            });
+
+            // 1. Exchange code for tokens
+            const tokens = await this.googleAuthService.exchangeCodeForToken(loginData.code, 'login-email');
+            this.logger.debug('Successfully exchanged code for tokens');
+
+            // 2. Verify ID token and get user info
+            const userInfo = await this.googleAuthService.verifyIdToken(tokens.id_token);
+            this.logger.debug('Successfully verified ID token and got user info:', {
+                email: userInfo.email,
+                emailVerified: userInfo.email_verified,
+                name: userInfo.name
+            });
+
+            // 3. Find or create user
+            let user = await this.userRepository.findOne({
+                where: { email: userInfo.email }
+            });
+
+            let isNewUser = false;
+            if (!user) {
+                // Create new user
+                user = this.userRepository.create({
+                    email: userInfo.email,
+                    full_name: userInfo.name,
+                    gg_auth: userInfo.sub,
+                    is_verified_email: userInfo.email_verified
+                });
+                await this.userRepository.save(user);
+                isNewUser = true;
+
+                // Create new wallet for user
+                const solanaWallet = this.generateSolanaWallet();
+                const wallet = this.walletRepository.create({
+                    user_id: user.id,
+                    sol_address: solanaWallet.publicKey,
+                    private_key: solanaWallet.privateKey,
+                });
+                await this.walletRepository.save(wallet);
+            }
+
+            // 4. Generate JWT token
+            const payload = { 
+                user_id: user.id,
+                email: user.email
+            };
+            
+            const accessToken = this.jwtService.sign(payload);
+
+            res.cookie('access_token', accessToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: parseInt(process.env.COOKIE_EXPIRES_IN) * 1000,
+            });
+
+            return {
+                status: 200,
+                message: isNewUser ? 'Account created and login successful' : 'Login successful',
+            };
+
+        } catch (error) {
+            this.logger.error(`Error in handleGoogleLogin: ${error.message}`, error.stack);
+            throw new BadRequestException(error.message || 'Login failed');
+        }
     }
 }
