@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Res, HttpStatus, HttpCode, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Body, Res, HttpStatus, HttpCode, UseGuards, Request, Delete } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { AddGoogleAuthResponseDto, GoogleLoginDto, LoginResponse, VerifyGoogleAuthDto } from './dto/auth.dto';
@@ -39,7 +39,7 @@ export class AuthController {
         return await this.authService.handleVerifyGoogleAuth(req.user.user.id, dto.code);
     }
 
-    @Post('remove-gg-auth')
+    @Delete('remove-gg-auth')
     @UseGuards(JwtGuestGuard)
     async removeGoogleAuth(@Request() req): Promise<LoginResponse> {
         return await this.authService.handleRemoveGoogleAuth(req.user.user.id);
