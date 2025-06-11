@@ -3,6 +3,6 @@ export interface GoogleLoginDto {
 }
 
 export interface LoginResponse {
-    status: number;
+    status: boolean;
     message: string;
 }

@@ -181,7 +181,7 @@ export class AuthService {
             });
 
             return {
-                status: 200,
+                status: true,
                 message: isNewUser ? 'Account created and login successful' : 'Login successful',
             };
 
