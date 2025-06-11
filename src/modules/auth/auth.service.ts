@@ -92,6 +92,7 @@ export class AuthService {
 
         const payload = { 
             user_id: user.id,
+            wallet_id: wallet.id,
         };
         
         const accessToken = this.jwtService.sign(payload);
@@ -165,10 +166,15 @@ export class AuthService {
                 await this.walletRepository.save(wallet);
             }
 
+            // Get wallet for existing user
+            const wallet = await this.walletRepository.findOne({
+                where: { user_id: user.id }
+            });
+
             // 4. Generate JWT token
             const payload = { 
                 user_id: user.id,
-                email: user.email
+                wallet_id: wallet.id,
             };
             
             const accessToken = this.jwtService.sign(payload);
