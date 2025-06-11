@@ -161,7 +161,6 @@ export class AuthService {
                 user = this.userRepository.create({
                     email: userInfo.email,
                     full_name: userInfo.name,
-                    gg_auth: userInfo.sub,
                     is_verified_email: userInfo.email_verified
                 });
                 await this.userRepository.save(user);

@@ -38,7 +38,7 @@ export class GoogleAuthService {
     ) {
         const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
         const clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
-        const redirectUri = this.configService.get<string>('GOOGLE_REDIRECT_URI');
+        const redirectUri = this.configService.get<string>('FRONTEND_URL_REDIRECT');
 
         if (!clientId || !clientSecret || !redirectUri) {
             throw new Error('Google OAuth configuration is missing');
@@ -53,7 +53,7 @@ export class GoogleAuthService {
         try {
             // Decode URL encoded code
             const decodedCode = decodeURIComponent(code);
-            const redirectUri = this.configService.get<string>('FRONTEND_URL') + '/' + path;
+            const redirectUri = this.configService.get<string>('FRONTEND_URL_REDIRECT') + '/' + path;
             
             this.logger.debug('Attempting to exchange code for token with params:', {
                 originalCode: code,
@@ -177,7 +177,7 @@ export class GoogleAuthService {
             throw new Error('GOOGLE_CLIENT_ID is not configured');
         }
 
-        const redirectUri = this.configService.get<string>('FRONTEND_URL') + '/' + path;
+        const redirectUri = this.configService.get<string>('FRONTEND_URL_REDIRECT') + '/' + path;
         const params = new URLSearchParams();
         params.append('client_id', clientId);
         params.append('redirect_uri', redirectUri);

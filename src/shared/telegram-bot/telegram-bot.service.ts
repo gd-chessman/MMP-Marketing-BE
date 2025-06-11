@@ -18,13 +18,13 @@ export class TelegramBotService implements OnModuleInit {
     ) {
         this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN', '');
         this.workerUrl = this.configService.get<string>('URL_WORKER', 'https://proxy.michosso2025.workers.dev');
-        this.frontendUrl = this.configService.get<string>('FRONTEND_URL');
+        this.frontendUrl = this.configService.get<string>('FRONTEND_URL_REDIRECT');
 
         if (!this.botToken) {
             throw new Error('TELEGRAM_BOT_TOKEN is missing in .env file');
         }
         if (!this.frontendUrl) {
-            throw new Error('FRONTEND_URL is missing in .env file');
+            throw new Error('FRONTEND_URL_REDIRECT is missing in .env file');
         }
     }
 
