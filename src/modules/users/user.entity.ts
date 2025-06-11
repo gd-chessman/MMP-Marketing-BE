@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, BeforeInsert } from 'typeorm';
 
 
@@ -16,6 +17,7 @@ export class User {
   is_verified_email: boolean;
 
   @Column({ type: 'varchar', nullable: true })
+  @Exclude()
   gg_auth: string;
 
   @Column({ default: false })
