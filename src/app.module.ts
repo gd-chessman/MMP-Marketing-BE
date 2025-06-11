@@ -8,7 +8,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './modules/users/user.module';
 import { WalletModule } from './modules/wallets/wallet.module';
-import { TelegramCodeModule } from './modules/telegram_codes/telegram-code.module';
+import { VerifyCodeModule } from './modules/verify-codes/verify-code.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SharedModule } from './shared/shared.module';
 
@@ -25,7 +25,7 @@ import { SharedModule } from './shared/shared.module';
     UserModule,
     WalletModule,
     AuthModule,
-    TelegramCodeModule,
+    VerifyCodeModule,
     SharedModule,
   ],
   controllers: [AppController], // Các controller của ứng dụng

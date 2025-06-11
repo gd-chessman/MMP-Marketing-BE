@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TelegramBotService } from './telegram-bot.service';
-import { TelegramCodeModule } from '../../modules/telegram_codes/telegram-code.module';
+import { VerifyCodeModule } from '../../modules/verify-codes/verify-code.module';
 
 @Module({
   imports: [
     ConfigModule,
-    TelegramCodeModule,
+    VerifyCodeModule,
   ],
   providers: [TelegramBotService],
   exports: [TelegramBotService],

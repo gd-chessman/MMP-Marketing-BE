@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TelegramCode } from '../telegram_codes/telegram-code.entity';
+import { VerifyCode } from '../verify-codes/verify-code.entity';
 import { User } from '../users/user.entity';
 import { Wallet } from '../wallets/wallet.entity';
 import { Keypair } from '@solana/web3.js';
@@ -21,8 +21,8 @@ export class AuthService {
         private jwtService: JwtService,
         private googleAuthService: GoogleAuthService,
         private telegramBotService: TelegramBotService,
-        @InjectRepository(TelegramCode)
-        private telegramCodesRepository: Repository<TelegramCode>,
+        @InjectRepository(VerifyCode)
+        private verifyCodesRepository: Repository<VerifyCode>,
         @InjectRepository(User)
         private userRepository: Repository<User>,
         @InjectRepository(Wallet)
@@ -43,7 +43,7 @@ export class AuthService {
         }
 
         // Validate telegram code
-        const telegramCode = await this.telegramCodesRepository.findOne({
+        const telegramCode = await this.verifyCodesRepository.findOne({
             where: {
                 code,
                 telegram_id: telegramId,
@@ -62,7 +62,7 @@ export class AuthService {
 
         // Mark code as used
         telegramCode.is_used = true;
-        await this.telegramCodesRepository.save(telegramCode);
+        await this.verifyCodesRepository.save(telegramCode);
 
         // Check if user exists
         let user = await this.userRepository.findOne({
@@ -388,13 +388,13 @@ export class AuthService {
             const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
             // Save verification code to database
-            const telegramCode = this.telegramCodesRepository.create({
+            const telegramCode = this.verifyCodesRepository.create({
                 telegram_id: user.telegram_id,
                 code: verificationCode,
                 is_used: false,
                 expires_at: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes expiry
             });
-            await this.telegramCodesRepository.save(telegramCode);
+            await this.verifyCodesRepository.save(telegramCode);
 
             // Send verification code via Telegram
             await this.telegramBotService.sendEmailVerificationCode(user.telegram_id, verificationCode);
@@ -430,7 +430,7 @@ export class AuthService {
             }
 
             // Validate verification code
-            const telegramCode = await this.telegramCodesRepository.findOne({
+            const telegramCode = await this.verifyCodesRepository.findOne({
                 where: {
                     code,
                     telegram_id: user.telegram_id,
@@ -449,7 +449,7 @@ export class AuthService {
 
             // Mark code as used
             telegramCode.is_used = true;
-            await this.telegramCodesRepository.save(telegramCode);
+            await this.verifyCodesRepository.save(telegramCode);
 
             // Update user's email verification status
             user.is_verified_email = true;

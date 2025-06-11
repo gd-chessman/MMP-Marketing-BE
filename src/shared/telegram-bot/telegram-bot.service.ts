@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TelegramCodeService } from '../../modules/telegram_codes/telegram-code.service';
+import { VerifyCodeService } from '../../modules/verify-codes/verify-code.service';
 import axios from 'axios';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class TelegramBotService implements OnModuleInit {
 
     constructor(
         private configService: ConfigService,
-        private readonly telegramCodesService: TelegramCodeService,
+        private readonly verifyCodeService: VerifyCodeService,
     ) {
         this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN', '');
         this.workerUrl = this.configService.get<string>('URL_WORKER', 'https://proxy.michosso2025.workers.dev');
@@ -75,7 +75,7 @@ export class TelegramBotService implements OnModuleInit {
         if (text?.startsWith('/start')) {
             try {
                 // Tạo mã code mới cho user
-                const code = await this.telegramCodesService.generateCode(telegramId);
+                const code = await this.verifyCodeService.generateCode(telegramId);
                 
                 const message = `
 ⭐️ *Welcome to MemePump Marketing* 🤘

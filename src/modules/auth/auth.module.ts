@@ -5,7 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { TelegramCode } from '../telegram_codes/telegram-code.entity';
+import { VerifyCode } from '../verify-codes/verify-code.entity';
 import { User } from '../users/user.entity';
 import { Wallet } from '../wallets/wallet.entity';
 import { JwtGuestStrategy } from './jwt-guest.strategy';
@@ -15,7 +15,7 @@ import { TelegramBotModule } from '../../shared/telegram-bot/telegram-bot.module
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([TelegramCode, User, Wallet]),
+        TypeOrmModule.forFeature([VerifyCode, User, Wallet]),
         HttpModule,
         TelegramBotModule,
         JwtModule.registerAsync({
