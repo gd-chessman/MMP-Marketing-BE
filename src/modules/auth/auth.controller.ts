@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Res, HttpStatus, HttpCode, UseGuards, Request, Delete } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
-import { AddGoogleAuthResponseDto, GoogleLoginDto, LoginResponse, VerifyGoogleAuthDto } from './dto/auth.dto';
+import { AddGoogleAuthResponseDto, GoogleLoginDto, LoginResponse, VerifyGoogleAuthDto, AddEmailAuthDto } from './dto/auth.dto';
 import { JwtGuestGuard } from './jwt-guest.guard';
 
 @Controller('auth')
@@ -43,5 +43,11 @@ export class AuthController {
     @UseGuards(JwtGuestGuard)
     async removeGoogleAuth(@Request() req): Promise<LoginResponse> {
         return await this.authService.handleRemoveGoogleAuth(req.user.user.id);
+    }
+
+    @Post('add-link-email')
+    @UseGuards(JwtGuestGuard)
+    async addLinkEmailAuth(@Request() req, @Body() dto: AddEmailAuthDto): Promise<LoginResponse> {
+        return await this.authService.handleAddLinkEmailAuth(req.user.user.id, dto.code);
     }
 }

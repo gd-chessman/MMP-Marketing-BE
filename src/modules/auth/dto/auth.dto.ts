@@ -17,3 +17,7 @@ export interface AddGoogleAuthResponseDto {
 export interface VerifyGoogleAuthDto {
     code: string;  // 6-digit code from Google Authenticator
 }
+
+export interface AddEmailAuthDto {
+    code: string;  // Authorization code from Google
+}

@@ -305,5 +305,54 @@ export class AuthService {
         }
     }
 
-    
+    async handleAddLinkEmailAuth(userId: number, code: string): Promise<LoginResponse> {
+        try {
+            // Find user
+            const user = await this.userRepository.findOne({
+                where: { id: userId }
+            });
+
+            if (!user) {
+                throw new BadRequestException('User not found');
+            }
+
+            // Check if user has Telegram ID
+            if (!user.telegram_id) {
+                throw new BadRequestException('User does not have a Telegram account');
+            }
+
+            // Check if user already has email
+            if (user.email) {
+                throw new BadRequestException('User already has an email account');
+            }
+
+            // Exchange code for tokens
+            const tokens = await this.googleAuthService.exchangeCodeForToken(code, 'security');
+
+            // Verify ID token and get user info
+            const userInfo = await this.googleAuthService.verifyIdToken(tokens.id_token);
+
+            // Check if email is already used by another account
+            const existingUser = await this.userRepository.findOne({
+                where: { email: userInfo.email }
+            });
+
+            if (existingUser) {
+                throw new BadRequestException('Email is already associated with another account');
+            }
+
+            // Update user with email information
+            user.email = userInfo.email;
+            user.full_name = userInfo.name;
+            user.is_verified_email = userInfo.email_verified;
+            await this.userRepository.save(user);
+
+            return {
+                status: true,
+                message: 'Email authentication added successfully'
+            };
+        } catch (error) {
+            throw new BadRequestException(error.message || 'Failed to add email authentication');
+        }
+    }
 }
