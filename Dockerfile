@@ -38,4 +38,4 @@ COPY --from=builder /app/.env .env
 EXPOSE 8000
 
 # Chạy ứng dụng
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "dist/main.js"]
