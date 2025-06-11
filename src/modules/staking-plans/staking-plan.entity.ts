@@ -14,6 +14,9 @@ export class StakingPlan {
   @Column({ type: 'int' })
   period_days: number;
 
+  @Column({ type: 'boolean', default: true })
+  is_active: boolean;
+
   @CreateDateColumn()
   created_at: Date;
 } 

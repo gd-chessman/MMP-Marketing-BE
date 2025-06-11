@@ -10,5 +10,13 @@ export class StakingPlanService {
     private stakingPlanRepository: Repository<StakingPlan>,
   ) {}
 
+  async findAll(): Promise<StakingPlan[]> {
+    return this.stakingPlanRepository.find({
+      where: {
+        is_active: true,
+      },
+    });
+  }
+
   // Các phương thức sẽ được thêm sau
 } 
