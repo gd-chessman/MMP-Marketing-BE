@@ -135,7 +135,6 @@ export class AuthService {
         try {
             // 1. Exchange code for tokens
             const tokens = await this.googleAuthService.exchangeCodeForToken(loginData.code, 'login-email');
-            this.logger.debug('Successfully exchanged code for tokens');
 
             // 2. Verify ID token and get user info
             const userInfo = await this.googleAuthService.verifyIdToken(tokens.id_token);

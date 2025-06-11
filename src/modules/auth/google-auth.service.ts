@@ -75,12 +75,6 @@ export class GoogleAuthService {
 
     async verifyIdToken(idToken: string): Promise<GoogleUserInfo> {
         try {
-            this.logger.debug('Attempting to verify ID token:', {
-                tokenLength: idToken.length,
-                tokenPrefix: idToken.substring(0, 10) + '...',
-                clientId: this.clientId
-            });
-
             const response = await firstValueFrom(
                 this.httpService.get<GoogleTokenInfo>(
                     `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`
