@@ -38,4 +38,10 @@ export class AuthController {
     async verifyGoogleAuth(@Request() req, @Body() dto: VerifyGoogleAuthDto): Promise<LoginResponse> {
         return await this.authService.handleVerifyGoogleAuth(req.user.user.id, dto.code);
     }
+
+    @Post('remove-gg-auth')
+    @UseGuards(JwtGuestGuard)
+    async removeGoogleAuth(@Request() req): Promise<LoginResponse> {
+        return await this.authService.handleRemoveGoogleAuth(req.user.user.id);
+    }
 }

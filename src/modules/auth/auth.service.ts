@@ -275,4 +275,33 @@ export class AuthService {
             throw new BadRequestException(error.message || 'Internal server error');
         }
     }
+
+    async handleRemoveGoogleAuth(userId: number): Promise<LoginResponse> {
+        try {
+            // Find user
+            const user = await this.userRepository.findOne({
+                where: { id: userId }
+            });
+
+            if (!user) {
+                throw new BadRequestException('User not found');
+            }
+
+            if (!user.gg_auth) {
+                throw new BadRequestException('Google Authenticator is not set up for this user');
+            }
+
+            // Remove Google Auth
+            user.gg_auth = null;
+            user.is_verified_gg_auth = false;
+            await this.userRepository.save(user);
+
+            return {
+                status: true,
+                message: 'Google Authenticator removed successfully'
+            };
+        } catch (error) {
+            throw new BadRequestException(error.message || 'Internal server error');
+        }
+    }
 }
