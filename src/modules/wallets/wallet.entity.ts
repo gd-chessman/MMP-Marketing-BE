@@ -1,17 +1,16 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, BeforeInsert, ManyToOne, JoinColumn, Unique } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, BeforeInsert, ManyToOne, JoinColumn } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { User } from '../users/user.entity';
 
 @Entity('wallets')
-@Unique(['user_id'])
 export class Wallet {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'bigint', nullable: true })
   user_id: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'user_id' })
   user: User;
 
