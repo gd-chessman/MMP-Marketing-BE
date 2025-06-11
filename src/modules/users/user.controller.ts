@@ -7,9 +7,4 @@ import { JwtGuestGuard } from '../auth/jwt-guest.guard';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Get()
-  @UseGuards(JwtGuestGuard)
-  async findAll(): Promise<User[]> {
-    return this.userService.findAll();
-  }
 } 

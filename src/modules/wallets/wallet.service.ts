@@ -12,9 +12,4 @@ export class WalletService {
     private userService: UserService,
   ) {}
 
-  async findAll(): Promise<Wallet[]> {
-    return this.walletRepository.find({
-      relations: ['user']
-    });
-  }
 } 

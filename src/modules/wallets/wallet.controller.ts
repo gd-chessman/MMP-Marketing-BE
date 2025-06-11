@@ -8,9 +8,4 @@ import { JwtGuestGuard } from '../auth/jwt-guest.guard';
 export class WalletController {
   constructor(private readonly walletService: WalletService) {}
 
-  @Get()
-  @UseGuards(JwtGuestGuard)
-  async findAll(): Promise<Wallet[]> {
-    return this.walletService.findAll();
-  }
 } 
