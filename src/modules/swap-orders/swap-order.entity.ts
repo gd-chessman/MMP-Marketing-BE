@@ -4,6 +4,7 @@ import { Wallet } from '../wallets/wallet.entity';
 export enum TokenType {
   SOL = 'SOL',
   USDT = 'USDT',
+  USDC = 'USDC',
   // Thêm các loại token khác nếu cần
 }
 
