@@ -10,5 +10,12 @@ export class DepositWithdrawService {
     private depositWithdrawRepository: Repository<DepositWithdraw>,
   ) {}
 
+  async findByWalletId(walletId: number): Promise<DepositWithdraw[]> {
+    return this.depositWithdrawRepository.find({
+      where: { wallet_id: walletId },
+      order: { created_at: 'DESC' }
+    });
+  }
+
   // Các phương thức sẽ được thêm sau
 } 
