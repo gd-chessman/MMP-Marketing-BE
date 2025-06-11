@@ -12,6 +12,9 @@ import { VerifyCodeModule } from './modules/verify-codes/verify-code.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SharedModule } from './shared/shared.module';
 import { SwapOrderModule } from './modules/swap-orders/swap-order.module';
+import { StakingPlanModule } from './modules/staking-plans/staking-plan.module';
+import { UserStakeModule } from './modules/user-stakes/user-stake.module';
+import { DepositWithdrawModule } from './modules/deposit-withdraws/deposit-withdraw.module';
 
 @Module({
   imports: [
@@ -27,6 +30,9 @@ import { SwapOrderModule } from './modules/swap-orders/swap-order.module';
     VerifyCodeModule,
     SharedModule,
     SwapOrderModule,
+    StakingPlanModule,
+    UserStakeModule,
+    DepositWithdrawModule,
   ],
   controllers: [AppController], // Các controller của ứng dụng
   providers: [AppService]
