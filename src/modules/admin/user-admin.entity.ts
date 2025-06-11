@@ -10,8 +10,8 @@ export class UserAdmin {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'full_name', type: 'varchar' })
-  fullName: string;
+  @Column({ type: 'varchar' })
+  full_name: string;
 
   @Column({ type: 'varchar', unique: true })
   email: string;
@@ -26,9 +26,9 @@ export class UserAdmin {
   })
   role: UserAdminRole;
 
-  @Column({ name: 'is_active', type: 'boolean', default: true })
-  isActive: boolean;
+  @Column({ type: 'boolean', default: true })
+  is_active: boolean;
 
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  @CreateDateColumn()
+  created_at: Date;
 }
