@@ -7,10 +7,8 @@ import { AuthController } from './auth.controller';
 import { TelegramCode } from '../telegram_codes/telegram-code.entity';
 import { User } from '../users/user.entity';
 import { Wallet } from '../wallets/wallet.entity';
-import { JwtAdminGuard } from './jwt-admin.guard';
-import { JwtGuestGuard } from './jwt-guest.guard';
-import { JwtAdminStrategy } from './jwt-admin.strategy';
 import { JwtGuestStrategy } from './jwt-guest.strategy';
+import { JwtGuestGuard } from './jwt-guest.guard';
 
 @Module({
     imports: [
@@ -27,9 +25,7 @@ import { JwtGuestStrategy } from './jwt-guest.strategy';
     controllers: [AuthController],
     providers: [
         AuthService, 
-        JwtAdminStrategy,
         JwtGuestStrategy,
-        JwtAdminGuard,
         JwtGuestGuard
     ],
     exports: [AuthService],

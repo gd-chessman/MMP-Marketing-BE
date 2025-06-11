@@ -1,8 +1,9 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, BeforeInsert, ManyToOne, JoinColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, BeforeInsert, ManyToOne, JoinColumn, Unique } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { User } from '../users/user.entity';
 
 @Entity('wallets')
+@Unique(['user_id'])
 export class Wallet {
   @PrimaryGeneratedColumn()
   id: number;

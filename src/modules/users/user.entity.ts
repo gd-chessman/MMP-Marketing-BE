@@ -1,10 +1,5 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, BeforeInsert } from 'typeorm';
 
-export enum Role {
-  ADMIN = 1,
-  MEMBER = 2,
-  GUEST = 3
-}
 
 @Entity('users')
 export class User {
@@ -28,9 +23,6 @@ export class User {
 
   @Column({ type: 'varchar', nullable: true })
   telegram_id: string;
-
-  @Column({ type: 'enum', enum: Role, default: Role.GUEST })
-  role: Role;
 
   @CreateDateColumn()
   created_at: Date;

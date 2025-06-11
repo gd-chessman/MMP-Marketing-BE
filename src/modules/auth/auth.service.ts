@@ -8,7 +8,6 @@ import { User } from '../users/user.entity';
 import { Wallet } from '../wallets/wallet.entity';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { Role } from '../users/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -66,7 +65,6 @@ export class AuthService {
         if (!user) {
             user = this.userRepository.create({
                 telegram_id: telegramId,
-                role: Role.GUEST // Set default role as GUEST for new users
             });
             await this.userRepository.save(user);
         }
@@ -89,7 +87,6 @@ export class AuthService {
 
         const payload = { 
             user_id: user.id,
-            role: user.role
         };
         
         const accessToken = this.jwtService.sign(payload);

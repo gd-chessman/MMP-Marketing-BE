@@ -6,7 +6,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Wallet } from '../wallets/wallet.entity';
-import { Role } from '../users/user.entity';
 
 @Injectable()
 export class JwtGuestStrategy extends PassportStrategy(Strategy, 'jwt-guest') {
@@ -36,15 +35,9 @@ export class JwtGuestStrategy extends PassportStrategy(Strategy, 'jwt-guest') {
             return null;
         }
 
-        // Allow both GUEST and ADMIN roles
-        if (user.role !== Role.GUEST && user.role !== Role.ADMIN) {
-            return null;
-        }
-
         return {
             user,
-            wallet,
-            role: user.role
+            wallet
         };
     }
 } 
