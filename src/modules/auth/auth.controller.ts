@@ -1,7 +1,7 @@
-import { Controller, Post, Body, Res, HttpStatus, HttpCode, UseGuards, Request, Delete } from '@nestjs/common';
+import { Controller, Post, Body, Res, HttpStatus, HttpCode, UseGuards, Request, Delete, Get } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
-import { AddGoogleAuthResponseDto, GoogleLoginDto, LoginResponse, VerifyGoogleAuthDto, AddEmailAuthDto } from './dto/auth.dto';
+import { AddGoogleAuthResponseDto, GoogleLoginDto, LoginResponse, VerifyGoogleAuthDto, AddEmailAuthDto, SendEmailVerificationDto, VerifyEmailCodeDto } from './dto/auth.dto';
 import { JwtGuestGuard } from './jwt-guest.guard';
 
 @Controller('auth')
@@ -49,5 +49,17 @@ export class AuthController {
     @UseGuards(JwtGuestGuard)
     async addLinkEmailAuth(@Request() req, @Body() dto: AddEmailAuthDto): Promise<LoginResponse> {
         return await this.authService.handleAddLinkEmailAuth(req.user.user.id, dto.code);
+    }
+
+    @Get('send-verify-email')
+    @UseGuards(JwtGuestGuard)
+    async sendEmailVerification(@Request() req): Promise<LoginResponse> {
+        return await this.authService.handleSendTeleVerification(req.user.user.id);
+    }
+
+    @Post('verify-code-email')
+    @UseGuards(JwtGuestGuard)
+    async verifyEmailCode(@Request() req, @Body() dto: VerifyEmailCodeDto): Promise<LoginResponse> {
+        return await this.authService.handleVerifyTeleCode(req.user.user.id, dto.code);
     }
 }

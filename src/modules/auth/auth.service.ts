@@ -11,6 +11,7 @@ import bs58 from 'bs58';
 import { GoogleLoginDto, LoginResponse, AddGoogleAuthResponseDto } from './dto/auth.dto';
 import { GoogleAuthService } from './google-auth.service';
 import * as speakeasy from 'speakeasy';
+import { TelegramBotService } from '../../shared/telegram-bot/telegram-bot.service';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +20,7 @@ export class AuthService {
     constructor(
         private jwtService: JwtService,
         private googleAuthService: GoogleAuthService,
+        private telegramBotService: TelegramBotService,
         @InjectRepository(TelegramCode)
         private telegramCodesRepository: Repository<TelegramCode>,
         @InjectRepository(User)
@@ -341,18 +343,124 @@ export class AuthService {
                 throw new BadRequestException('Email is already associated with another account');
             }
 
-            // Update user with email information
+            // Update user with email information without verification
             user.email = userInfo.email;
             user.full_name = userInfo.name;
-            user.is_verified_email = userInfo.email_verified;
+            // Không cập nhật is_verified_email
             await this.userRepository.save(user);
 
             return {
                 status: true,
-                message: 'Email authentication added successfully'
+                message: 'Email added successfully'
             };
         } catch (error) {
-            throw new BadRequestException(error.message || 'Failed to add email authentication');
+            throw new BadRequestException(error.message || 'Failed to add email');
+        }
+    }
+
+    async handleSendTeleVerification(userId: number): Promise<LoginResponse> {
+        try {
+            // Find user
+            const user = await this.userRepository.findOne({
+                where: { id: userId }
+            });
+
+            if (!user) {
+                throw new BadRequestException('User not found');
+            }
+
+            // Check if user has Telegram ID
+            if (!user.telegram_id) {
+                throw new BadRequestException('User does not have a Telegram account');
+            }
+
+            // Check if user has email
+            if (!user.email) {
+                throw new BadRequestException('User does not have an email account');
+            }
+
+            // Check if email is already verified
+            if (user.is_verified_email) {
+                throw new BadRequestException('Email is already verified');
+            }
+
+            // Generate verification code (6 digits)
+            const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+            // Save verification code to database
+            const telegramCode = this.telegramCodesRepository.create({
+                telegram_id: user.telegram_id,
+                code: verificationCode,
+                is_used: false,
+                expires_at: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes expiry
+            });
+            await this.telegramCodesRepository.save(telegramCode);
+
+            // Send verification code via Telegram
+            await this.telegramBotService.sendEmailVerificationCode(user.telegram_id, verificationCode);
+
+            return {
+                status: true,
+                message: 'Verification code sent successfully'
+            };
+        } catch (error) {
+            throw new BadRequestException(error.message || 'Failed to send verification code');
+        }
+    }
+
+    async handleVerifyTeleCode(userId: number, code: string): Promise<LoginResponse> {
+        try {
+            // Find user
+            const user = await this.userRepository.findOne({
+                where: { id: userId }
+            });
+
+            if (!user) {
+                throw new BadRequestException('User not found');
+            }
+
+            // Check if user has Telegram ID
+            if (!user.telegram_id) {
+                throw new BadRequestException('User does not have a Telegram account');
+            }
+
+            // Check if email is already verified
+            if (user.is_verified_email) {
+                throw new BadRequestException('Email is already verified');
+            }
+
+            // Validate verification code
+            const telegramCode = await this.telegramCodesRepository.findOne({
+                where: {
+                    code,
+                    telegram_id: user.telegram_id,
+                    is_used: false
+                }
+            });
+
+            if (!telegramCode) {
+                throw new BadRequestException('Invalid verification code');
+            }
+
+            // Check expiration
+            if (new Date() > telegramCode.expires_at) {
+                throw new BadRequestException('Verification code has expired');
+            }
+
+            // Mark code as used
+            telegramCode.is_used = true;
+            await this.telegramCodesRepository.save(telegramCode);
+
+            // Update user's email verification status
+            user.is_verified_email = true;
+            await this.userRepository.save(user);
+
+            return {
+                status: true,
+                message: 'Email verified successfully'
+            };
+        } catch (error) {
+            throw new BadRequestException(error.message || 'Failed to verify email');
         }
     }
 }

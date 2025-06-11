@@ -21,3 +21,11 @@ export interface VerifyGoogleAuthDto {
 export interface AddEmailAuthDto {
     code: string;  // Authorization code from Google
 }
+
+export interface SendEmailVerificationDto {
+    email: string;
+}
+
+export interface VerifyEmailCodeDto {
+    code: string;
+}

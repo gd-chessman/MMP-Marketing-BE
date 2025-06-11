@@ -11,11 +11,13 @@ import { Wallet } from '../wallets/wallet.entity';
 import { JwtGuestStrategy } from './jwt-guest.strategy';
 import { JwtGuestGuard } from './jwt-guest.guard';
 import { GoogleAuthService } from './google-auth.service';
+import { TelegramBotModule } from '../../shared/telegram-bot/telegram-bot.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([TelegramCode, User, Wallet]),
         HttpModule,
+        TelegramBotModule,
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({

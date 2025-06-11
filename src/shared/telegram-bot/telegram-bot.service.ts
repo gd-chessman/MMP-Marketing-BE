@@ -159,4 +159,23 @@ This link will expire in 10 minutes.`;
         await this.startPolling();
         this.logger.log('🚀 Telegram bot started');
     }
+
+    async sendEmailVerificationCode(telegramId: string, code: string): Promise<void> {
+        try {
+            const message = `
+🔐 *Verification Code*
+
+Your verification code is: *${code}*
+
+This code will expire in 5 minutes.
+Please enter this code to verify your email address.`;
+
+            await this.sendMessage(parseInt(telegramId), message, {
+                parse_mode: 'Markdown'
+            });
+        } catch (error) {
+            this.logger.error(`Error sending email verification code: ${error.message}`);
+            throw error;
+        }
+    }
 } 
