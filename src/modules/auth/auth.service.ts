@@ -133,22 +133,12 @@ export class AuthService {
 
     async handleGoogleLogin(loginData: GoogleLoginDto, res: Response): Promise<LoginResponse> {
         try {
-            this.logger.debug('Starting Google login process with code:', {
-                codeLength: loginData.code.length,
-                codePrefix: loginData.code.substring(0, 10) + '...'
-            });
-
             // 1. Exchange code for tokens
             const tokens = await this.googleAuthService.exchangeCodeForToken(loginData.code, 'login-email');
             this.logger.debug('Successfully exchanged code for tokens');
 
             // 2. Verify ID token and get user info
             const userInfo = await this.googleAuthService.verifyIdToken(tokens.id_token);
-            this.logger.debug('Successfully verified ID token and got user info:', {
-                email: userInfo.email,
-                emailVerified: userInfo.email_verified,
-                name: userInfo.name
-            });
 
             // 3. Find or create user
             let user = await this.userRepository.findOne({
@@ -197,7 +187,6 @@ export class AuthService {
             };
 
         } catch (error) {
-            this.logger.error(`Error in handleGoogleLogin: ${error.message}`, error.stack);
             throw new BadRequestException(error.message || 'Login failed');
         }
     }

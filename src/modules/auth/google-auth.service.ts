@@ -55,14 +55,6 @@ export class GoogleAuthService {
             const decodedCode = decodeURIComponent(code);
             const redirectUri = this.configService.get<string>('FRONTEND_URL_REDIRECT') + '/' + path;
             
-            this.logger.debug('Attempting to exchange code for token with params:', {
-                originalCode: code,
-                decodedCode,
-                client_id: this.clientId,
-                redirect_uri: redirectUri,
-                grant_type: 'authorization_code'
-            });
-
             const response = await firstValueFrom(
                 this.httpService.post<GoogleTokenResponse>(
                     'https://oauth2.googleapis.com/token',
@@ -75,16 +67,8 @@ export class GoogleAuthService {
                     }
                 )
             );
-
-            this.logger.debug('Successfully exchanged code for token');
             return response.data;
         } catch (error) {
-            this.logger.error('Error exchanging code for token:', {
-                error: error.message,
-                response: error.response?.data,
-                status: error.response?.status,
-                headers: error.response?.headers
-            });
             throw new BadRequestException('Failed to exchange code for token');
         }
     }
@@ -104,29 +88,12 @@ export class GoogleAuthService {
             );
 
             const payload = response.data;
-            this.logger.debug('Token verification response:', {
-                iss: payload.iss,
-                aud: payload.aud,
-                expectedIss: ['accounts.google.com', 'https://accounts.google.com'],
-                expectedAud: this.clientId,
-                email: payload.email,
-                emailVerified: payload.email_verified
-            });
-
             // Verify token
             if (payload.iss !== 'accounts.google.com' && payload.iss !== 'https://accounts.google.com') {
-                this.logger.error('Invalid token issuer:', {
-                    expected: ['accounts.google.com', 'https://accounts.google.com'],
-                    received: payload.iss
-                });
                 throw new BadRequestException('Invalid token issuer');
             }
 
             if (payload.aud !== this.clientId) {
-                this.logger.error('Invalid token audience:', {
-                    expected: this.clientId,
-                    received: payload.aud
-                });
                 throw new BadRequestException('Invalid token audience');
             }
 
@@ -140,11 +107,6 @@ export class GoogleAuthService {
 
             return payload;
         } catch (error) {
-            this.logger.error('Error verifying ID token:', {
-                error: error.message,
-                response: error.response?.data,
-                status: error.response?.status
-            });
             throw new BadRequestException('Invalid Google token');
         }
     }
@@ -162,11 +124,6 @@ export class GoogleAuthService {
 
             return response.data;
         } catch (error) {
-            this.logger.error('Error getting user info:', {
-                error: error.message,
-                response: error.response?.data,
-                status: error.response?.status
-            });
             throw new BadRequestException('Failed to get user info');
         }
     }
