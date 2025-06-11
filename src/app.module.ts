@@ -15,6 +15,7 @@ import { SwapOrderModule } from './modules/swap-orders/swap-order.module';
 import { StakingPlanModule } from './modules/staking-plans/staking-plan.module';
 import { UserStakeModule } from './modules/user-stakes/user-stake.module';
 import { DepositWithdrawModule } from './modules/deposit-withdraws/deposit-withdraw.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { DepositWithdrawModule } from './modules/deposit-withdraws/deposit-withd
     StakingPlanModule,
     UserStakeModule,
     DepositWithdrawModule,
+    AdminModule,
   ],
   controllers: [AppController], // Các controller của ứng dụng
   providers: [AppService]
