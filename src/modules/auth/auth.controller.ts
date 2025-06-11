@@ -1,7 +1,8 @@
-import { Controller, Post, Body, Res, HttpStatus, HttpCode, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Res, HttpStatus, HttpCode, UseGuards, Request } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
-import { GoogleLoginDto, LoginResponse } from './dto/auth.dto';
+import { AddGoogleAuthResponseDto, GoogleLoginDto, LoginResponse, VerifyGoogleAuthDto } from './dto/auth.dto';
+import { JwtGuestGuard } from './jwt-guest.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -24,5 +25,17 @@ export class AuthController {
     @Post('login-email')
     async loginWithGoogle(@Body() googleData: GoogleLoginDto, @Res({ passthrough: true }) res: Response): Promise<LoginResponse> {
         return await this.authService.handleGoogleLogin(googleData, res);
+    }
+
+    @Post('add-gg-auth')
+    @UseGuards(JwtGuestGuard)
+    async addGoogleAuth(@Request() req): Promise<AddGoogleAuthResponseDto> {
+        return await this.authService.handleAddGoogleAuth(req.user.user.id);
+    }
+
+    @Post('verify-gg-auth')
+    @UseGuards(JwtGuestGuard)
+    async verifyGoogleAuth(@Request() req, @Body() dto: VerifyGoogleAuthDto): Promise<LoginResponse> {
+        return await this.authService.handleVerifyGoogleAuth(req.user.user.id, dto.code);
     }
 }

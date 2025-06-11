@@ -8,8 +8,9 @@ import { User } from '../users/user.entity';
 import { Wallet } from '../wallets/wallet.entity';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { GoogleLoginDto, LoginResponse } from './dto/auth.dto';
+import { GoogleLoginDto, LoginResponse, AddGoogleAuthResponseDto } from './dto/auth.dto';
 import { GoogleAuthService } from './google-auth.service';
+import * as speakeasy from 'speakeasy';
 
 @Injectable()
 export class AuthService {
@@ -193,6 +194,85 @@ export class AuthService {
 
         } catch (error) {
             throw new BadRequestException(error.message || 'Login failed');
+        }
+    }
+
+    async handleAddGoogleAuth(userId: number): Promise<AddGoogleAuthResponseDto> {
+        try {
+            // Find user
+            const user = await this.userRepository.findOne({
+                where: { id: userId }
+            });
+
+            if (!user) {
+                throw new BadRequestException('User not found');
+            }
+
+            // Check if Google Auth is already active
+            if (user.is_verified_gg_auth) {
+                throw new BadRequestException('Google Authenticator is already active for this user');
+            }
+
+            // Generate secret using speakeasy
+            const secret = speakeasy.generateSecret({
+                length: 20,
+                name: `Memepump:${user.id}`,
+                issuer: 'Memepump'
+            });
+
+            // Save new secret to database
+            user.gg_auth = secret.base32;
+            user.is_verified_gg_auth = false;
+            await this.userRepository.save(user);
+
+            return {
+                status: true,
+                message: 'Google Authenticator setup successfully',
+                qr_code_url: secret.otpauth_url,
+                secret_key: secret.base32
+            };
+        } catch (error) {
+            throw new BadRequestException(error.message || 'Internal server error');
+        }
+    }
+
+    async handleVerifyGoogleAuth(userId: number, code: string): Promise<LoginResponse> {
+        try {
+            // Find user
+            const user = await this.userRepository.findOne({
+                where: { id: userId }
+            });
+
+            if (!user) {
+                throw new BadRequestException('User not found');
+            }
+
+            if (!user.gg_auth) {
+                throw new BadRequestException('Google Authenticator is not set up for this user');
+            }
+
+            // Verify the token
+            const verified = speakeasy.totp.verify({
+                secret: user.gg_auth,
+                encoding: 'base32',
+                token: code,
+                window: 1 // Allow 30 seconds clock skew
+            });
+
+            if (!verified) {
+                throw new BadRequestException('Invalid verification code');
+            }
+
+            // Mark Google Auth as verified
+            user.is_verified_gg_auth = true;
+            await this.userRepository.save(user);
+
+            return {
+                status: true,
+                message: 'Google Authenticator verified successfully'
+            };
+        } catch (error) {
+            throw new BadRequestException(error.message || 'Internal server error');
         }
     }
 }
