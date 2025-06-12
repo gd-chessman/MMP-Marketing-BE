@@ -13,6 +13,9 @@ export class UserStake {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ type: 'varchar' })
+  name: string;
+
   @Column({ type: 'int' })
   wallet_id: number;
 
