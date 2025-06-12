@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -20,9 +20,21 @@ export class SwapOrderService {
   ) {
     this.connection = new Connection(this.configService.get('SOLANA_RPC_URL'));
     // Load swap pool authority from environment
-    this.swapPoolAuthority = Keypair.fromSecretKey(
-      Uint8Array.from(Buffer.from(this.configService.get('SWAP_POOL_AUTHORITY_PRIVATE_KEY'), 'base64'))
-    );
+    const privateKey = this.configService.get<string>('SWAP_POOL_AUTHORITY_PRIVATE_KEY');
+    if (!privateKey) {
+      throw new InternalServerErrorException('SWAP_POOL_AUTHORITY_PRIVATE_KEY is not configured');
+    }
+
+    try {
+      const decodedKey = Buffer.from(privateKey, 'base64');
+      if (decodedKey.length !== 64) {
+        this.logger.error(`Invalid key size: ${decodedKey.length} bytes`);
+        throw new InternalServerErrorException('Invalid private key size');
+      }
+      this.swapPoolAuthority = Keypair.fromSecretKey(decodedKey);
+    } catch (error) {
+      this.logger.error(`Failed to create keypair: ${error.message}`);
+    }
   }
 
   async create(wallet: any, dto: CreateSwapOrderDto): Promise<SwapOrder> {
