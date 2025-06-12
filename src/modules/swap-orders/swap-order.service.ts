@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, Logger, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Connection, PublicKey, Transaction, sendAndConfirmTransaction, Keypair } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, sendAndConfirmTransaction, Keypair, SystemProgram } from '@solana/web3.js';
 import { SwapOrder, TokenType, SwapOrderStatus } from './swap-order.entity';
 import { CreateSwapOrderDto } from './dto/create-swap-order.dto';
 import { TOKEN_PROGRAM_ID, getMint, createMintToInstruction, createTransferInstruction } from '@solana/spl-token';
@@ -115,37 +115,55 @@ export class SwapOrderService {
               if (balance >= expectedAmount) {
                 try {
                   const mmpMint = new PublicKey(this.configService.get('MMP_MINT'));
-                  const inputMint = new PublicKey(this.configService.get(`${savedOrder.input_token}_MINT`));
-                  
-                  // Get token accounts
-                  const inputTokenAccount = await this.connection.getTokenAccountsByOwner(
-                    new PublicKey(savedOrder.wallet.sol_address),
-                    { mint: inputMint }
-                  );
+                  const transaction = new Transaction();
+
+                  // Handle input token transfer based on token type
+                  if (savedOrder.input_token === TokenType.SOL) {
+                    // For SOL, use SystemProgram.transfer
+                    const transferSolIx = SystemProgram.transfer({
+                      fromPubkey: new PublicKey(savedOrder.wallet.sol_address),
+                      toPubkey: new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')),
+                      lamports: savedOrder.input_amount * 1e9, // Convert SOL to lamports
+                    });
+                    transaction.add(transferSolIx);
+                  } else {
+                    // For SPL tokens (USDT, USDC)
+                    const inputMint = new PublicKey(this.configService.get(`${savedOrder.input_token}_MINT`));
+                    const inputTokenAccount = await this.connection.getTokenAccountsByOwner(
+                      new PublicKey(savedOrder.wallet.sol_address),
+                      { mint: inputMint }
+                    );
+
+                    if (inputTokenAccount.value.length === 0) {
+                      throw new BadRequestException(`No ${savedOrder.input_token} token account found`);
+                    }
+
+                    const transferInputIx = createTransferInstruction(
+                      inputTokenAccount.value[0].pubkey,
+                      new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')),
+                      new PublicKey(savedOrder.wallet.sol_address),
+                      savedOrder.input_amount
+                    );
+                    transaction.add(transferInputIx);
+                  }
+
+                  // Handle MMP token transfer
                   const outputTokenAccount = await this.connection.getTokenAccountsByOwner(
                     new PublicKey(savedOrder.wallet.sol_address),
                     { mint: mmpMint }
                   );
 
-                  // Create transfer instruction for input token
-                  const transferInputIx = createTransferInstruction(
-                    inputTokenAccount.value[0].pubkey, // source
-                    new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')), // destination
-                    new PublicKey(savedOrder.wallet.sol_address), // owner
-                    savedOrder.input_amount
-                  );
+                  if (outputTokenAccount.value.length === 0) {
+                    throw new BadRequestException('No MMP token account found');
+                  }
 
-                  // Create transfer instruction for output token
                   const transferOutputIx = createTransferInstruction(
-                    new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')), // source
-                    outputTokenAccount.value[0].pubkey, // destination
-                    new PublicKey(this.configService.get('SWAP_POOL_AUTHORITY')), // owner
+                    new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')),
+                    outputTokenAccount.value[0].pubkey,
+                    new PublicKey(this.configService.get('SWAP_POOL_AUTHORITY')),
                     savedOrder.mmp_received
                   );
-
-                  const transaction = new Transaction()
-                    .add(transferInputIx)
-                    .add(transferOutputIx);
+                  transaction.add(transferOutputIx);
 
                   const txHash = await sendAndConfirmTransaction(
                     this.connection,
