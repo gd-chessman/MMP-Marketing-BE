@@ -5,12 +5,13 @@ import { ConfigService } from '@nestjs/config';
 import { Connection, PublicKey, Transaction, sendAndConfirmTransaction, Keypair, SystemProgram } from '@solana/web3.js';
 import { SwapOrder, TokenType, SwapOrderStatus } from './swap-order.entity';
 import { CreateSwapOrderDto } from './dto/create-swap-order.dto';
-import { TOKEN_PROGRAM_ID, getMint, createMintToInstruction, createTransferInstruction } from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID, getMint, createMintToInstruction, createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 
 @Injectable()
 export class SwapOrderService {
   private readonly logger = new Logger(SwapOrderService.name);
   private readonly connection: Connection;
+  private readonly swapPoolAuthority: Keypair;
 
   constructor(
     @InjectRepository(SwapOrder)
@@ -18,6 +19,10 @@ export class SwapOrderService {
     private configService: ConfigService,
   ) {
     this.connection = new Connection(this.configService.get('SOLANA_RPC_URL'));
+    // Load swap pool authority from environment
+    this.swapPoolAuthority = Keypair.fromSecretKey(
+      Uint8Array.from(Buffer.from(this.configService.get('SWAP_POOL_AUTHORITY_PRIVATE_KEY'), 'base64'))
+    );
   }
 
   async create(wallet: any, dto: CreateSwapOrderDto): Promise<SwapOrder> {
@@ -27,7 +32,7 @@ export class SwapOrderService {
         throw new BadRequestException('Input amount must be greater than 0');
       }
 
-      // 2. Kiểm tra số dư
+      // 2. Check balance
       let hasBalance = false;
       try {
         if (dto.input_token === TokenType.SOL) {
@@ -56,7 +61,7 @@ export class SwapOrderService {
         throw new BadRequestException('Insufficient balance');
       }
 
-      // 3. Tính toán số lượng MMP token và tỷ lệ swap
+      // 3. Calculate MMP amount and swap rate
       const IDO_PRICE = 0.0001; // $0.0001 per token
       const tokenPrices = {
         [TokenType.SOL]: 100, // $100 per SOL
@@ -66,7 +71,7 @@ export class SwapOrderService {
       const inputPrice = tokenPrices[dto.input_token];
       const mmpAmount = Math.floor((dto.input_amount * inputPrice) / IDO_PRICE);
 
-      // 4. Tạo và lưu swap order
+      // 4. Create and save swap order
       const swapOrder = this.swapOrderRepository.create({
         wallet_id: wallet.id,
         input_token: dto.input_token,
@@ -78,130 +83,93 @@ export class SwapOrderService {
 
       const savedOrder = await this.swapOrderRepository.save(swapOrder);
 
-      // 5. Bắt đầu lắng nghe giao dịch
+      // 5. Execute swap transaction
       try {
-        const walletAccount = await this.connection.getAccountInfo(
-          new PublicKey(savedOrder.wallet.sol_address)
+        const transaction = new Transaction();
+        const userPublicKey = new PublicKey(wallet.sol_address);
+        const mmpMint = new PublicKey(this.configService.get('MMP_MINT'));
+
+        // Get or create user's MMP token account
+        const userMmpTokenAccount = await getAssociatedTokenAddress(
+          mmpMint,
+          userPublicKey
         );
 
-        if (!walletAccount) {
-          throw new NotFoundException('Wallet not found');
+        // Check if user's MMP token account exists
+        const userMmpAccountInfo = await this.connection.getAccountInfo(userMmpTokenAccount);
+        if (!userMmpAccountInfo) {
+          // Create user's MMP token account if it doesn't exist
+          transaction.add(
+            createAssociatedTokenAccountInstruction(
+              userPublicKey,
+              userMmpTokenAccount,
+              userPublicKey,
+              mmpMint
+            )
+          );
         }
 
-        this.connection.onAccountChange(
-          new PublicKey(savedOrder.wallet.sol_address),
-          async (accountInfo) => {
-            try {
-              let balance = 0;
-              if (savedOrder.input_token === TokenType.SOL) {
-                balance = accountInfo.lamports;
-              } else {
-                const mintAddress = this.configService.get(`${savedOrder.input_token}_MINT`);
-                const tokenAccounts = await this.connection.getTokenAccountsByOwner(
-                  new PublicKey(savedOrder.wallet.sol_address),
-                  { mint: new PublicKey(mintAddress) }
-                );
-                
-                if (tokenAccounts.value.length > 0) {
-                  const tokenBalance = await this.connection.getTokenAccountBalance(
-                    tokenAccounts.value[0].pubkey
-                  );
-                  balance = tokenBalance.value.uiAmount;
-                }
-              }
+        // Handle input token transfer
+        if (dto.input_token === TokenType.SOL) {
+          // For SOL, transfer to swap pool
+          transaction.add(
+            SystemProgram.transfer({
+              fromPubkey: userPublicKey,
+              toPubkey: new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')),
+              lamports: dto.input_amount * 1e9, // Convert SOL to lamports
+            })
+          );
+        } else {
+          // For SPL tokens (USDT, USDC)
+          const inputMint = new PublicKey(this.configService.get(`${dto.input_token}_MINT`));
+          const inputTokenAccount = await this.connection.getTokenAccountsByOwner(
+            userPublicKey,
+            { mint: inputMint }
+          );
 
-              const expectedAmount = savedOrder.input_amount * savedOrder.swap_rate;
-
-              if (balance >= expectedAmount) {
-                try {
-                  const mmpMint = new PublicKey(this.configService.get('MMP_MINT'));
-                  const transaction = new Transaction();
-
-                  // Handle input token transfer based on token type
-                  if (savedOrder.input_token === TokenType.SOL) {
-                    // For SOL, use SystemProgram.transfer
-                    const transferSolIx = SystemProgram.transfer({
-                      fromPubkey: new PublicKey(savedOrder.wallet.sol_address),
-                      toPubkey: new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')), // Direct to MMP mint
-                      lamports: savedOrder.input_amount * 1e9, // Convert SOL to lamports
-                    });
-                    transaction.add(transferSolIx);
-                  } else {
-                    // For SPL tokens (USDT, USDC)
-                    const inputMint = new PublicKey(this.configService.get(`${savedOrder.input_token}_MINT`));
-                    const inputTokenAccount = await this.connection.getTokenAccountsByOwner(
-                      new PublicKey(savedOrder.wallet.sol_address),
-                      { mint: inputMint }
-                    );
-
-                    if (inputTokenAccount.value.length === 0) {
-                      throw new BadRequestException(`No ${savedOrder.input_token} token account found`);
-                    }
-
-                    const transferInputIx = createTransferInstruction(
-                      inputTokenAccount.value[0].pubkey,
-                      new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')), // Direct to MMP mint
-                      new PublicKey(savedOrder.wallet.sol_address),
-                      savedOrder.input_amount
-                    );
-                    transaction.add(transferInputIx);
-                  }
-
-                  // Handle MMP token transfer
-                  const outputTokenAccount = await this.connection.getTokenAccountsByOwner(
-                    new PublicKey(savedOrder.wallet.sol_address),
-                    { mint: mmpMint }
-                  );
-
-                  if (outputTokenAccount.value.length === 0) {
-                    throw new BadRequestException('No MMP token account found');
-                  }
-
-                  const transferOutputIx = createTransferInstruction(
-                    new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')),
-                    outputTokenAccount.value[0].pubkey,
-                    new PublicKey(this.configService.get('SWAP_POOL_AUTHORITY')),
-                    savedOrder.mmp_received
-                  );
-                  transaction.add(transferOutputIx);
-
-                  const txHash = await sendAndConfirmTransaction(
-                    this.connection,
-                    transaction,
-                    [Keypair.fromSecretKey(Buffer.from(savedOrder.wallet.private_key, 'base64'))]
-                  );
-
-                  // Update order status and transaction hash
-                  savedOrder.status = SwapOrderStatus.COMPLETED;
-                  savedOrder.tx_hash_ref = txHash;
-                  await this.swapOrderRepository.save(savedOrder);
-                } catch (error) {
-                  this.logger.error(`Error swapping token: ${error.message}`);
-                  savedOrder.status = SwapOrderStatus.FAILED;
-                  await this.swapOrderRepository.save(savedOrder);
-                }
-              }
-            } catch (error) {
-              this.logger.error(`Error processing transaction: ${error.message}`);
-            }
+          if (inputTokenAccount.value.length === 0) {
+            throw new BadRequestException(`No ${dto.input_token} token account found`);
           }
+
+          transaction.add(
+            createTransferInstruction(
+              inputTokenAccount.value[0].pubkey,
+              new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')),
+              userPublicKey,
+              dto.input_amount
+            )
+          );
+        }
+
+        // Mint MMP tokens to user
+        transaction.add(
+          createMintToInstruction(
+            mmpMint,
+            userMmpTokenAccount,
+            this.swapPoolAuthority.publicKey,
+            mmpAmount
+          )
         );
 
-        // Timeout sau 5 phút nếu không có giao dịch
-        setTimeout(async () => {
-          if (savedOrder.status === SwapOrderStatus.PENDING) {
-            savedOrder.status = SwapOrderStatus.FAILED;
-            await this.swapOrderRepository.save(savedOrder);
-          }
-        }, 5 * 60 * 1000);
+        // Send and confirm transaction
+        const txHash = await sendAndConfirmTransaction(
+          this.connection,
+          transaction,
+          [this.swapPoolAuthority]
+        );
 
+        // Update order status
+        savedOrder.status = SwapOrderStatus.COMPLETED;
+        savedOrder.tx_hash_ref = txHash;
+        await this.swapOrderRepository.save(savedOrder);
+
+        return savedOrder;
       } catch (error) {
-        this.logger.error(`Error listening to transaction: ${error.message}`);
+        this.logger.error(`Error executing swap: ${error.message}`);
         savedOrder.status = SwapOrderStatus.FAILED;
         await this.swapOrderRepository.save(savedOrder);
+        throw new BadRequestException(`Swap failed: ${error.message}`);
       }
-
-      return savedOrder;
     } catch (error) {
       this.logger.error(`Error creating swap order: ${error.message}`);
       throw new BadRequestException(error.message);
