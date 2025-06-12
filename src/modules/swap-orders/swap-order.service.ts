@@ -57,13 +57,14 @@ export class SwapOrderService {
       }
 
       // 3. Tính toán số lượng MMP token và tỷ lệ swap
-      const rates = {
-        [TokenType.SOL]: 100,
-        [TokenType.USDT]: 100,
-        [TokenType.USDC]: 100
+      const IDO_PRICE = 0.0001; // $0.0001 per token
+      const tokenPrices = {
+        [TokenType.SOL]: 100, // $100 per SOL
+        [TokenType.USDT]: 1,  // $1 per USDT
+        [TokenType.USDC]: 1,  // $1 per USDC
       };
-      const swapRate = rates[dto.input_token];
-      const mmpAmount = dto.input_amount * swapRate;
+      const inputPrice = tokenPrices[dto.input_token];
+      const mmpAmount = Math.floor((dto.input_amount * inputPrice) / IDO_PRICE);
 
       // 4. Tạo và lưu swap order
       const swapOrder = this.swapOrderRepository.create({
@@ -71,7 +72,7 @@ export class SwapOrderService {
         input_token: dto.input_token,
         input_amount: dto.input_amount,
         mmp_received: mmpAmount,
-        swap_rate: swapRate,
+        swap_rate: inputPrice,
         status: SwapOrderStatus.PENDING
       });
 
