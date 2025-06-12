@@ -6,6 +6,7 @@ import { Connection, PublicKey, Transaction, sendAndConfirmTransaction, Keypair,
 import { SwapOrder, TokenType, SwapOrderStatus } from './swap-order.entity';
 import { CreateSwapOrderDto } from './dto/create-swap-order.dto';
 import { TOKEN_PROGRAM_ID, getMint, createMintToInstruction, createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
+import bs58 from 'bs58';
 
 @Injectable()
 export class SwapOrderService {
@@ -26,7 +27,8 @@ export class SwapOrderService {
     }
 
     try {
-      const decodedKey = Buffer.from(privateKey, 'base64');
+      // Decode private key từ bs58 thay vì base64
+      const decodedKey = bs58.decode(privateKey);
       if (decodedKey.length !== 64) {
         this.logger.error(`Invalid key size: ${decodedKey.length} bytes`);
         throw new InternalServerErrorException('Invalid private key size');
