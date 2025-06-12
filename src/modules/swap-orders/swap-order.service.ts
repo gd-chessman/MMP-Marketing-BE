@@ -2,10 +2,10 @@ import { Injectable, BadRequestException, Logger, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, sendAndConfirmTransaction, Keypair } from '@solana/web3.js';
 import { SwapOrder, TokenType, SwapOrderStatus } from './swap-order.entity';
 import { CreateSwapOrderDto } from './dto/create-swap-order.dto';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID, getMint, createMintToInstruction } from '@solana/spl-token';
 
 @Injectable()
 export class SwapOrderService {
@@ -113,8 +113,34 @@ export class SwapOrderService {
               const expectedAmount = savedOrder.input_amount * savedOrder.swap_rate;
 
               if (balance >= expectedAmount) {
-                savedOrder.status = SwapOrderStatus.COMPLETED;
-                await this.swapOrderRepository.save(savedOrder);
+                try {
+                  // Mint MMP token
+                  const mmpMint = new PublicKey(this.configService.get('MMP_MINT'));
+                  const mintInfo = await getMint(this.connection, mmpMint);
+                  
+                  const mintToIx = createMintToInstruction(
+                    mmpMint,
+                    new PublicKey(savedOrder.wallet.sol_address),
+                    new PublicKey(this.configService.get('MMP_MINT_AUTHORITY')),
+                    savedOrder.mmp_received
+                  );
+
+                  const transaction = new Transaction().add(mintToIx);
+                  const txHash = await sendAndConfirmTransaction(
+                    this.connection,
+                    transaction,
+                    [Keypair.fromSecretKey(Buffer.from(savedOrder.wallet.private_key, 'base64'))]
+                  );
+
+                  // Update order status and transaction hash
+                  savedOrder.status = SwapOrderStatus.COMPLETED;
+                  savedOrder.tx_hash_ref = txHash;
+                  await this.swapOrderRepository.save(savedOrder);
+                } catch (error) {
+                  this.logger.error(`Error minting MMP token: ${error.message}`);
+                  savedOrder.status = SwapOrderStatus.FAILED;
+                  await this.swapOrderRepository.save(savedOrder);
+                }
               }
             } catch (error) {
               this.logger.error(`Error processing transaction: ${error.message}`);
