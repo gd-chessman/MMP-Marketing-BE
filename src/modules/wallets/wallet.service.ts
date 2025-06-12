@@ -13,6 +13,9 @@ export class WalletService {
   ) {}
 
   async findOne(id: number): Promise<Wallet> {
-    return this.walletRepository.findOne({ where: { id } });
+    return this.walletRepository.findOne({ 
+      where: { id },
+      relations: ['user']
+    });
   }
 } 
