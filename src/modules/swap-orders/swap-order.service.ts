@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -84,7 +84,7 @@ export class SwapOrderService {
         );
 
         if (!walletAccount) {
-          throw new Error('Wallet not found');
+          throw new NotFoundException('Wallet not found');
         }
 
         this.connection.onAccountChange(
