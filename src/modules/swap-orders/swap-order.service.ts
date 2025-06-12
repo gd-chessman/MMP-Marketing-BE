@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { Connection, PublicKey, Transaction, sendAndConfirmTransaction, Keypair } from '@solana/web3.js';
 import { SwapOrder, TokenType, SwapOrderStatus } from './swap-order.entity';
 import { CreateSwapOrderDto } from './dto/create-swap-order.dto';
-import { TOKEN_PROGRAM_ID, getMint, createMintToInstruction } from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID, getMint, createMintToInstruction, createTransferInstruction } from '@solana/spl-token';
 
 @Injectable()
 export class SwapOrderService {
@@ -114,18 +114,39 @@ export class SwapOrderService {
 
               if (balance >= expectedAmount) {
                 try {
-                  // Mint MMP token
                   const mmpMint = new PublicKey(this.configService.get('MMP_MINT'));
-                  const mintInfo = await getMint(this.connection, mmpMint);
+                  const inputMint = new PublicKey(this.configService.get(`${savedOrder.input_token}_MINT`));
                   
-                  const mintToIx = createMintToInstruction(
-                    mmpMint,
+                  // Get token accounts
+                  const inputTokenAccount = await this.connection.getTokenAccountsByOwner(
                     new PublicKey(savedOrder.wallet.sol_address),
-                    new PublicKey(this.configService.get('MMP_MINT_AUTHORITY')),
+                    { mint: inputMint }
+                  );
+                  const outputTokenAccount = await this.connection.getTokenAccountsByOwner(
+                    new PublicKey(savedOrder.wallet.sol_address),
+                    { mint: mmpMint }
+                  );
+
+                  // Create transfer instruction for input token
+                  const transferInputIx = createTransferInstruction(
+                    inputTokenAccount.value[0].pubkey, // source
+                    new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')), // destination
+                    new PublicKey(savedOrder.wallet.sol_address), // owner
+                    savedOrder.input_amount
+                  );
+
+                  // Create transfer instruction for output token
+                  const transferOutputIx = createTransferInstruction(
+                    new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')), // source
+                    outputTokenAccount.value[0].pubkey, // destination
+                    new PublicKey(this.configService.get('SWAP_POOL_AUTHORITY')), // owner
                     savedOrder.mmp_received
                   );
 
-                  const transaction = new Transaction().add(mintToIx);
+                  const transaction = new Transaction()
+                    .add(transferInputIx)
+                    .add(transferOutputIx);
+
                   const txHash = await sendAndConfirmTransaction(
                     this.connection,
                     transaction,
@@ -137,7 +158,7 @@ export class SwapOrderService {
                   savedOrder.tx_hash_ref = txHash;
                   await this.swapOrderRepository.save(savedOrder);
                 } catch (error) {
-                  this.logger.error(`Error minting MMP token: ${error.message}`);
+                  this.logger.error(`Error swapping token: ${error.message}`);
                   savedOrder.status = SwapOrderStatus.FAILED;
                   await this.swapOrderRepository.save(savedOrder);
                 }
