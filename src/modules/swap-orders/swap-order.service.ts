@@ -122,7 +122,7 @@ export class SwapOrderService {
                     // For SOL, use SystemProgram.transfer
                     const transferSolIx = SystemProgram.transfer({
                       fromPubkey: new PublicKey(savedOrder.wallet.sol_address),
-                      toPubkey: new PublicKey(this.configService.get('MMP_MINT')), // Direct to MMP mint
+                      toPubkey: new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')), // Direct to MMP mint
                       lamports: savedOrder.input_amount * 1e9, // Convert SOL to lamports
                     });
                     transaction.add(transferSolIx);
@@ -140,7 +140,7 @@ export class SwapOrderService {
 
                     const transferInputIx = createTransferInstruction(
                       inputTokenAccount.value[0].pubkey,
-                      new PublicKey(this.configService.get('MMP_MINT')), // Direct to MMP mint
+                      new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')), // Direct to MMP mint
                       new PublicKey(savedOrder.wallet.sol_address),
                       savedOrder.input_amount
                     );
@@ -158,9 +158,9 @@ export class SwapOrderService {
                   }
 
                   const transferOutputIx = createTransferInstruction(
-                    new PublicKey(this.configService.get('MMP_MINT')),
+                    new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')),
                     outputTokenAccount.value[0].pubkey,
-                    new PublicKey(savedOrder.wallet.sol_address),
+                    new PublicKey(this.configService.get('SWAP_POOL_AUTHORITY')),
                     savedOrder.mmp_received
                   );
                   transaction.add(transferOutputIx);
