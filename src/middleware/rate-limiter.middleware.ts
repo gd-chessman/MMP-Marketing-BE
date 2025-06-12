@@ -10,7 +10,7 @@ interface RateLimitInfo {
 @Injectable()
 export class RateLimiterMiddleware implements NestMiddleware {
   private readonly requestMap = new Map<string, RateLimitInfo>();
-  private readonly WINDOW_SIZE_IN_MINUTES = 10; // Thời gian cửa sổ (phút)
+  private readonly WINDOW_SIZE_IN_MINUTES = 5; // Thời gian cửa sổ (phút)
   private readonly MAX_REQUESTS = 100; // Số request tối đa trong cửa sổ
 
   use(req: Request, res: Response, next: NextFunction) {
