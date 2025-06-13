@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, OnModuleInit } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UserAdmin, UserAdminRole } from '../entites/user-admin.entity';
+import { UserAdmin, UserAdminRole } from '../user-admins/user-admin.entity';
 import * as bcrypt from 'bcrypt';
 import { Response } from 'express';
 
@@ -32,10 +32,10 @@ export class AuthService implements OnModuleInit {
           full_name: 'System Admin',
           role: UserAdminRole.ADMIN,
         });
-        console.log('Đã tạo tài khoản admin mặc định thành công');
+        console.log('Default admin account created successfully');
       }
     } catch (error) {
-      console.error('Lỗi khi tạo tài khoản admin mặc định:', error);
+      console.error('Error creating default admin account:', error);
     }
   }
 
@@ -57,11 +57,11 @@ export class AuthService implements OnModuleInit {
   async login(email: string, password: string, response: Response) {
     const user = await this.validateUser(email, password);
     if (!user) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     if (!user.is_active) {
-      throw new UnauthorizedException('Tài khoản đã bị khóa');
+      throw new UnauthorizedException('Account is locked');
     }
 
     const payload = { email: user.email, sub: user.id, role: user.role };
@@ -71,9 +71,8 @@ export class AuthService implements OnModuleInit {
     response.cookie('admin_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
-      path: '/',
+      sameSite: 'none',
+      maxAge: parseInt(process.env.COOKIE_EXPIRES_IN) * 1000,
     });
 
 
@@ -90,8 +89,7 @@ export class AuthService implements OnModuleInit {
     response.clearCookie('admin_token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
+      sameSite: 'none',
     });
 
     return {

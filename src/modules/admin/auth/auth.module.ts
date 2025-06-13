@@ -4,7 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { UserAdmin } from '../entites/user-admin.entity';
+import { UserAdmin } from '../user-admins/user-admin.entity';
 import { JwtAdminStrategy } from './jwt-admin.strategy';
 
 @Module({
