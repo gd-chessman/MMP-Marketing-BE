@@ -18,8 +18,8 @@ export class Wallet {
   sol_address: string;
 
   @Exclude()
-  @Column({ type: 'text' })
-  private_key: string;
+  @Column({ type: 'text', nullable: true })
+  private_key: string | null;
 
   @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
   balance_sol: number;

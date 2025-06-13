@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/comm
 import { JwtGuestGuard } from '../auth/jwt-guest.guard';
 import { SwapOrderService } from './swap-order.service';
 import { SwapOrder, SwapOrderStatus } from './swap-order.entity';
-import { CreateSwapOrderDto } from './dto/create-swap-order.dto';
+import { CreateSwapOrderDto, InitWeb3WalletDto, CompleteWeb3WalletDto } from './dto/create-swap-order.dto';
 
 @Controller('swap-orders')
 export class SwapOrderController {
@@ -22,5 +22,14 @@ export class SwapOrderController {
   async getMySwapOrders(@Req() req: any): Promise<SwapOrder[]> {
     return this.swapOrderService.findByWalletId(req.user.wallet.id);
   }
-  
+
+  @Post('web3-wallet')
+  async initWeb3Wallet(@Body() dto: InitWeb3WalletDto) {
+    return this.swapOrderService.initWeb3Wallet(dto);
+  }
+
+  @Post('web3-wallet/complete')
+  async completeWeb3Wallet(@Body() dto: CompleteWeb3WalletDto) {
+    return this.swapOrderService.completeWeb3Wallet(dto);
+  }
 } 
