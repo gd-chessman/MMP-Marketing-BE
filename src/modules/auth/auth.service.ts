@@ -468,34 +468,47 @@ export class AuthService {
 
     async handlePhantomLogin(loginData: PhantomLoginDto, res: Response): Promise<LoginResponse> {
         const { signature } = loginData;
-        if (!signature || !Array.isArray(signature)) {
-            throw new BadRequestException('Invalid signature format: signature must be an array of numbers');
+        if (!signature) {
+            throw new BadRequestException('Missing signature');
         }
 
         try {
-
-            // Chuyển đổi signature từ mảng số sang Uint8Array
-            const signatureUint8 = new Uint8Array(signature);
+            let signatureUint8: Uint8Array;
+            
+            // Xử lý signature dạng string
+            if (typeof signature === 'string') {
+                signatureUint8 = bs58.decode(signature);
+            } 
+            // Xử lý signature dạng mảng số
+            else if (Array.isArray(signature)) {
+                signatureUint8 = new Uint8Array(signature);
+            } else {
+                throw new BadRequestException('Invalid signature format');
+            }
 
             // Lấy public key từ 32 bytes đầu của signature
             const publicKey = new PublicKey(signatureUint8.slice(0, 32));
             const solAddress = publicKey.toString();
 
-            // Tạo user mới
-            const user = this.userRepository.create({});
-            await this.userRepository.save(user);
-
-            // Tạo wallet mới với sol_address từ publicKey
-            const wallet = this.walletRepository.create({
-                user_id: user.id,
-                sol_address: solAddress,
-                private_key: null,
+            // Kiểm tra xem đã có wallet với sol_address này chưa
+            let wallet = await this.walletRepository.findOne({
+                where: { sol_address: solAddress }
             });
-            await this.walletRepository.save(wallet);
 
-            // Tạo JWT
+            if (!wallet) {
+                // Nếu chưa có wallet, tạo user mới
+
+                // Tạo wallet mới với sol_address từ publicKey
+                wallet = this.walletRepository.create({
+                    user_id: null,
+                    sol_address: solAddress,
+                    private_key: null,
+                });
+                await this.walletRepository.save(wallet);
+            }
+
+            // Tạo JWT chỉ với wallet_id
             const payload = {
-                user_id: user.id,
                 wallet_id: wallet.id,
             };
             const accessToken = this.jwtService.sign(payload);
