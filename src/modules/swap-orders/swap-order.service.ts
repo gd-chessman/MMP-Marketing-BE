@@ -72,7 +72,7 @@ export class SwapOrderService {
   /**
    * Lấy giá USD của SOL từ Jupiter API với cache 15 giây
    */
-  private async getSolPriceUSD(): Promise<number> {
+  public async getSolPriceUSD(): Promise<number> {
     // Kiểm tra cache trước
     if (this.isCacheValid()) {
       this.logger.debug(`Using cached SOL price: $${this.solPriceCache.price}`);

@@ -32,4 +32,10 @@ export class SwapOrderController {
   async completeWeb3Wallet(@Body() dto: CompleteWeb3WalletDto) {
     return this.swapOrderService.completeWeb3Wallet(dto);
   }
+
+  @Get('sol-price')
+  async getSolPrice() {
+    const price_usd = await this.swapOrderService.getSolPriceUSD();
+    return { price_usd };
+  }
 } 
