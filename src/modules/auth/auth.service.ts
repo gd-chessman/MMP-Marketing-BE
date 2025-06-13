@@ -104,7 +104,7 @@ export class AuthService {
         res.cookie('access_token', accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'none',
             maxAge: parseInt(process.env.COOKIE_EXPIRES_IN) * 1000,
         });
 
@@ -127,7 +127,7 @@ export class AuthService {
         response.clearCookie('access_token', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict'
+            sameSite: 'none'
         });
         return {
             success: true,
@@ -185,7 +185,7 @@ export class AuthService {
             res.cookie('access_token', accessToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
+                sameSite: 'none',
                 maxAge: parseInt(process.env.COOKIE_EXPIRES_IN) * 1000,
             });
 
