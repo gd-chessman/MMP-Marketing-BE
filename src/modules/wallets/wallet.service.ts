@@ -11,6 +11,8 @@ import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
   private readonly connection: Connection;
+  private readonly USDT_MINT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB';
+  private readonly USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
   constructor(
     @InjectRepository(Wallet)
@@ -62,6 +64,36 @@ export class WalletService {
           } else {
             wallet.balance_mmp = 0;
           }
+        }
+
+        // Get USDT token balance
+        const tokenAccounts = await this.connection.getTokenAccountsByOwner(
+          new PublicKey(wallet.sol_address),
+          { mint: new PublicKey(this.USDT_MINT) }
+        );
+
+        if (tokenAccounts.value.length > 0) {
+          const tokenBalance = await this.connection.getTokenAccountBalance(
+            tokenAccounts.value[0].pubkey
+          );
+          wallet.balance_usdt = tokenBalance.value.uiAmount || 0;
+        } else {
+          wallet.balance_usdt = 0;
+        }
+
+        // Get USDC token balance
+        const usdcTokenAccounts = await this.connection.getTokenAccountsByOwner(
+          new PublicKey(wallet.sol_address),
+          { mint: new PublicKey(this.USDC_MINT) }
+        );
+
+        if (usdcTokenAccounts.value.length > 0) {
+          const tokenBalance = await this.connection.getTokenAccountBalance(
+            usdcTokenAccounts.value[0].pubkey
+          );
+          wallet.balance_usdc = tokenBalance.value.uiAmount || 0;
+        } else {
+          wallet.balance_usdc = 0;
         }
 
         // Save updated balances to database

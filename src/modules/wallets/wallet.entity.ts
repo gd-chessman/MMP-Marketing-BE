@@ -25,6 +25,12 @@ export class Wallet {
   balance_sol: number;
 
   @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
+  balance_usdt: number;
+
+  @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
+  balance_usdc: number;
+
+  @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
   balance_mmp: number;
 
   @CreateDateColumn()
