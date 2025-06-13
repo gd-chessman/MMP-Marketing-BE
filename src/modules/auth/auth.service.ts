@@ -12,7 +12,7 @@ import { GoogleLoginDto, LoginResponse, AddGoogleAuthResponseDto, PhantomLoginDt
 import { GoogleAuthService } from './google-auth.service';
 import * as speakeasy from 'speakeasy';
 import { TelegramBotService } from '../../shared/telegram-bot/telegram-bot.service';
-import nacl from 'tweetnacl';
+import * as nacl from 'tweetnacl';
 import { PublicKey } from '@solana/web3.js';
 
 @Injectable()
@@ -468,17 +468,16 @@ export class AuthService {
 
     async handlePhantomLogin(loginData: PhantomLoginDto, res: Response): Promise<LoginResponse> {
         const { signature } = loginData;
-        if (!signature) {
-            throw new BadRequestException('Missing signature');
+        if (!signature || !Array.isArray(signature)) {
+            throw new BadRequestException('Invalid signature format: signature must be an array of numbers');
         }
 
-        // Chuỗi message mà frontend phải ký (nên cố định, ví dụ: "Login to MMP-Marketing")
-        const message = 'Login to MMP-Marketing';
         try {
-            const signatureUint8 = bs58.decode(signature);
-            const messageUint8 = Buffer.from(message);
 
-            // Lấy public key từ signature
+            // Chuyển đổi signature từ mảng số sang Uint8Array
+            const signatureUint8 = new Uint8Array(signature);
+
+            // Lấy public key từ 32 bytes đầu của signature
             const publicKey = new PublicKey(signatureUint8.slice(0, 32));
             const solAddress = publicKey.toString();
 
@@ -511,6 +510,7 @@ export class AuthService {
                 message: 'Login successful',
             };
         } catch (e) {
+            this.logger.error('Phantom login error:', e);
             throw new BadRequestException('Invalid signature format');
         }
     }

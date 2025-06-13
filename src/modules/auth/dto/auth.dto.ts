@@ -31,5 +31,5 @@ export interface VerifyEmailCodeDto {
 }
 
 export interface PhantomLoginDto {
-    signature: string; // Chữ ký xác thực
+    signature: number[]; // Chữ ký xác thực dạng mảng số
 }
