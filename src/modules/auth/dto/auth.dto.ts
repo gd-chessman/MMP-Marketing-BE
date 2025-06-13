@@ -31,6 +31,5 @@ export interface VerifyEmailCodeDto {
 }
 
 export interface PhantomLoginDto {
-    publicKey: string; // Địa chỉ ví Solana
     signature: string; // Chữ ký xác thực
 }
