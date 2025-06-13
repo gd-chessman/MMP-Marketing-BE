@@ -7,12 +7,27 @@ import { SwapOrder, TokenType, SwapOrderStatus } from './swap-order.entity';
 import { CreateSwapOrderDto } from './dto/create-swap-order.dto';
 import { TOKEN_PROGRAM_ID, getMint, createMintToInstruction, createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import bs58 from 'bs58';
+import axios from 'axios';
 
 @Injectable()
 export class SwapOrderService {
   private readonly logger = new Logger(SwapOrderService.name);
   private readonly connection: Connection;
-  private readonly swapPoolAuthority: Keypair;
+  private readonly mmpAuthorityKeypair: Keypair;
+
+  // Cache cho giá SOL
+  private solPriceCache: { price: number; timestamp: number } | null = null;
+  private readonly CACHE_DURATION = 15 * 1000; // 15 giây
+
+  // Định nghĩa mint addresses cho từng token
+  private readonly TOKEN_MINT_ADDRESSES = {
+    [TokenType.SOL]: 'So11111111111111111111111111111111111111112',
+    [TokenType.USDT]: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
+    [TokenType.USDC]: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+  };
+
+  // Giá MMP01 token (1 MMP01 = 0.001 $)
+  private readonly MMP01_PRICE_USD = 0.001;
 
   constructor(
     @InjectRepository(SwapOrder)
@@ -20,22 +35,196 @@ export class SwapOrderService {
     private configService: ConfigService,
   ) {
     this.connection = new Connection(this.configService.get('SOLANA_RPC_URL'));
-    // Load swap pool authority from environment
-    const privateKey = this.configService.get<string>('SWAP_POOL_AUTHORITY_PRIVATE_KEY');
-    if (!privateKey) {
-      throw new InternalServerErrorException('SWAP_POOL_AUTHORITY_PRIVATE_KEY is not configured');
+    
+    // Khởi tạo MMP authority keypair từ environment
+    const mmpAuthorityPrivateKey = this.configService.get<string>('MMP_AUTHORITY_PRIVATE_KEY');
+    if (!mmpAuthorityPrivateKey) {
+      throw new InternalServerErrorException('MMP_AUTHORITY_PRIVATE_KEY is not configured');
+    }
+    
+    try {
+      const decodedKey = bs58.decode(mmpAuthorityPrivateKey);
+      if (decodedKey.length !== 64) {
+        this.logger.error(`Invalid MMP authority key size: ${decodedKey.length} bytes`);
+        throw new InternalServerErrorException('Invalid MMP authority private key size');
+      }
+      this.mmpAuthorityKeypair = Keypair.fromSecretKey(decodedKey);
+    } catch (error) {
+      this.logger.error(`Failed to create MMP authority keypair: ${error.message}`);
+      throw new InternalServerErrorException('Failed to initialize MMP authority keypair');
+    }
+  }
+
+  /**
+   * Kiểm tra cache có hợp lệ không
+   */
+  private isCacheValid(): boolean {
+    if (!this.solPriceCache) {
+      return false;
+    }
+    const now = Date.now();
+    return (now - this.solPriceCache.timestamp) < this.CACHE_DURATION;
+  }
+
+  /**
+   * Lấy giá USD của SOL từ Jupiter API với cache 15 giây
+   */
+  private async getSolPriceUSD(): Promise<number> {
+    // Kiểm tra cache trước
+    if (this.isCacheValid()) {
+      this.logger.debug(`Using cached SOL price: $${this.solPriceCache.price}`);
+      return this.solPriceCache.price;
     }
 
     try {
-      // Decode private key từ bs58 thay vì base64
-      const decodedKey = bs58.decode(privateKey);
-      if (decodedKey.length !== 64) {
-        this.logger.error(`Invalid key size: ${decodedKey.length} bytes`);
-        throw new InternalServerErrorException('Invalid private key size');
-      }
-      this.swapPoolAuthority = Keypair.fromSecretKey(decodedKey);
+      this.logger.debug('Fetching SOL price from Jupiter API...');
+      const response = await axios.get('https://api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112');
+      const price = parseFloat(response.data.data['So11111111111111111111111111111111111111112'].price);
+      
+      // Lưu vào cache
+      this.solPriceCache = {
+        price: price,
+        timestamp: Date.now()
+      };
+      
+      this.logger.debug(`Updated SOL price cache: $${price}`);
+      return price;
     } catch (error) {
-      this.logger.error(`Failed to create keypair: ${error.message}`);
+      this.logger.error(`Error fetching SOL price: ${error.message}`);
+      
+      // Nếu có cache cũ, sử dụng cache cũ thay vì throw error
+      if (this.solPriceCache) {
+        this.logger.warn(`Using stale cached SOL price: $${this.solPriceCache.price}`);
+        return this.solPriceCache.price;
+      }
+      
+      throw new BadRequestException('Failed to fetch SOL price');
+    }
+  }
+
+  /**
+   * Tính toán giá trị USD của input token
+   */
+  private async calculateUSDValue(inputToken: TokenType, inputAmount: number): Promise<number> {
+    if (inputToken === TokenType.SOL) {
+      const solPrice = await this.getSolPriceUSD();
+      return inputAmount * solPrice;
+    } else if (inputToken === TokenType.USDT || inputToken === TokenType.USDC) {
+      // USDT và USDC có giá 1:1 với USD
+      return inputAmount;
+    } else {
+      throw new BadRequestException(`Unsupported token type: ${inputToken}`);
+    }
+  }
+
+  /**
+   * Gửi token MMP01 từ ví sàn đến ví user
+   */
+  private async sendMMP01Tokens(userWalletAddress: string, usdValue: number): Promise<string> {
+    try {
+      // Tính số lượng MMP01 token cần gửi
+      const mmp01Amount = Math.floor(usdValue / this.MMP01_PRICE_USD);
+      
+      if (mmp01Amount <= 0) {
+        throw new BadRequestException('USD value too small to receive MMP01 tokens');
+      }
+
+      const transaction = new Transaction();
+      const userPublicKey = new PublicKey(userWalletAddress);
+      const mmp01Mint = new PublicKey(this.configService.get('MMP_MINT'));
+      const authorityPublicKey = this.mmpAuthorityKeypair.publicKey;
+      
+      // Lấy thông tin mint để biết decimals
+      const mintInfo = await this.connection.getParsedAccountInfo(mmp01Mint);
+      let decimals = 6; // Default decimals
+      
+      if (mintInfo.value && 'parsed' in mintInfo.value.data) {
+        decimals = mintInfo.value.data.parsed.info.decimals;
+      } else {
+        // Fallback: sử dụng getMint để lấy decimals
+        try {
+          const mintData = await getMint(this.connection, mmp01Mint);
+          decimals = mintData.decimals;
+        } catch (error) {
+          this.logger.warn(`Could not get mint decimals, using default: ${decimals}`);
+        }
+      }
+      
+      // Chuyển đổi số lượng token thành số nguyên dựa trên decimals
+      const transferAmount = Math.floor(mmp01Amount * Math.pow(10, decimals));
+      
+      this.logger.log(`Calculated transfer: ${mmp01Amount} MMP01 tokens = ${transferAmount} raw units (decimals: ${decimals})`);
+      
+      // Lấy hoặc tạo MMP01 token account cho user
+      const userMmp01TokenAccount = await getAssociatedTokenAddress(
+        mmp01Mint,
+        userPublicKey
+      );
+
+      // Lấy token account của ví sàn (authority)
+      const authorityMmp01TokenAccount = await getAssociatedTokenAddress(
+        mmp01Mint,
+        authorityPublicKey
+      );
+
+      // Kiểm tra xem user đã có MMP01 token account chưa
+      const userMmp01AccountInfo = await this.connection.getAccountInfo(userMmp01TokenAccount);
+      if (!userMmp01AccountInfo) {
+        // Tạo MMP01 token account cho user nếu chưa có
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            this.mmpAuthorityKeypair.publicKey, // Authority trả phí tạo ATA
+            userMmp01TokenAccount,
+            userPublicKey,
+            mmp01Mint
+          )
+        );
+      }
+
+      // Kiểm tra balance của ví sàn
+      const authorityAccountInfo = await this.connection.getAccountInfo(authorityMmp01TokenAccount);
+      if (!authorityAccountInfo) {
+        throw new BadRequestException('Authority wallet does not have MMP01 token account');
+      }
+
+      const authorityBalance = await this.connection.getTokenAccountBalance(authorityMmp01TokenAccount);
+      const authorityBalanceRaw = authorityBalance.value.amount;
+      
+      if (parseInt(authorityBalanceRaw) < transferAmount) {
+        throw new BadRequestException(`Insufficient MMP01 balance in authority wallet. Available: ${authorityBalance.value.uiAmount}, Required: ${mmp01Amount}`);
+      }
+
+      // Chuyển MMP01 tokens từ ví sàn đến user
+      transaction.add(
+        createTransferInstruction(
+          authorityMmp01TokenAccount,
+          userMmp01TokenAccount,
+          this.mmpAuthorityKeypair.publicKey,
+          transferAmount
+        )
+      );
+
+      // Lấy blockhash mới cho transaction
+      const { blockhash } = await this.connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = this.mmpAuthorityKeypair.publicKey;
+
+      // Gửi và xác nhận transaction
+      const txHash = await sendAndConfirmTransaction(
+        this.connection,
+        transaction,
+        [this.mmpAuthorityKeypair],
+        {
+          commitment: 'confirmed',
+          preflightCommitment: 'confirmed'
+        }
+      );
+
+      this.logger.log(`Transferred ${mmp01Amount} MMP01 tokens (${transferAmount} raw units) from authority to user ${userWalletAddress}`);
+      return txHash;
+    } catch (error) {
+      this.logger.error(`Error sending MMP01 tokens: ${error.message}`);
+      throw new BadRequestException(`Failed to send MMP01 tokens: ${error.message}`);
     }
   }
 
@@ -46,24 +235,49 @@ export class SwapOrderService {
         throw new BadRequestException('Input amount must be greater than 0');
       }
 
-      // 2. Check balance
+      // 2. Tạo Keypair từ private_key của wallet
+      let userKeypair: Keypair;
+      try {
+        const decodedKey = bs58.decode(wallet.private_key);
+        if (decodedKey.length !== 64) {
+          this.logger.error(`Invalid key size: ${decodedKey.length} bytes`);
+          throw new BadRequestException('Invalid private key size');
+        }
+        userKeypair = Keypair.fromSecretKey(decodedKey);
+      } catch (error) {
+        this.logger.error(`Failed to create keypair: ${error.message}`);
+        throw new BadRequestException('Invalid private key format');
+      }
+
+      // 3. Lấy mint address tương ứng với token input
+      const mintAddress = this.TOKEN_MINT_ADDRESSES[dto.input_token];
+      if (!mintAddress) {
+        throw new BadRequestException(`Unsupported token type: ${dto.input_token}`);
+      }
+
+      // 4. Kiểm tra balance
       let hasBalance = false;
+      let userTokenAccount: PublicKey | null = null;
+      let tokenDecimals = 0;
+
       try {
         if (dto.input_token === TokenType.SOL) {
-          const balance = await this.connection.getBalance(new PublicKey(wallet.sol_address));
-          hasBalance = balance >= dto.input_amount;
+          // Kiểm tra balance SOL
+          const balance = await this.connection.getBalance(userKeypair.publicKey);
+          hasBalance = balance >= dto.input_amount * 1e9; // Convert SOL to lamports
         } else {
-          const mintAddress = this.configService.get(`${dto.input_token}_MINT`);
+          // Kiểm tra balance SPL token (USDT, USDC)
+          const mint = new PublicKey(mintAddress);
           const tokenAccounts = await this.connection.getTokenAccountsByOwner(
-            new PublicKey(wallet.sol_address),
-            { mint: new PublicKey(mintAddress) }
+            userKeypair.publicKey,
+            { mint: mint }
           );
           
           if (tokenAccounts.value.length > 0) {
-            const tokenBalance = await this.connection.getTokenAccountBalance(
-              tokenAccounts.value[0].pubkey
-            );
+            userTokenAccount = tokenAccounts.value[0].pubkey;
+            const tokenBalance = await this.connection.getTokenAccountBalance(userTokenAccount);
             hasBalance = tokenBalance.value.uiAmount >= dto.input_amount;
+            tokenDecimals = tokenBalance.value.decimals;
           }
         }
       } catch (error) {
@@ -75,114 +289,108 @@ export class SwapOrderService {
         throw new BadRequestException('Insufficient balance');
       }
 
-      // 3. Calculate MMP amount and swap rate
-      const IDO_PRICE = 0.0001; // $0.0001 per token
-      const tokenPrices = {
-        [TokenType.SOL]: 100, // $100 per SOL
-        [TokenType.USDT]: 1,  // $1 per USDT
-        [TokenType.USDC]: 1,  // $1 per USDC
-      };
-      const inputPrice = tokenPrices[dto.input_token];
-      const mmpAmount = Math.floor((dto.input_amount * inputPrice) / IDO_PRICE);
+      // 5. Tính toán giá trị USD
+      const usdValue = await this.calculateUSDValue(dto.input_token, dto.input_amount);
+      const mmp01Amount = Math.floor(usdValue / this.MMP01_PRICE_USD);
 
-      // 4. Create and save swap order
+      // 6. Tạo và lưu swap order với trạng thái PENDING
       const swapOrder = this.swapOrderRepository.create({
         wallet_id: wallet.id,
         input_token: dto.input_token,
         input_amount: dto.input_amount,
-        mmp_received: mmpAmount,
-        swap_rate: inputPrice,
+        mmp_received: mmp01Amount,
+        swap_rate: usdValue / dto.input_amount,
         status: SwapOrderStatus.PENDING
       });
 
       const savedOrder = await this.swapOrderRepository.save(swapOrder);
 
-      // 5. Execute swap transaction
+      // 7. Thực hiện chuyển token vào ví đích
       try {
         const transaction = new Transaction();
-        const userPublicKey = new PublicKey(wallet.sol_address);
-        const mmpMint = new PublicKey(this.configService.get('MMP_MINT'));
+        const destinationPublicKey = new PublicKey(this.configService.get('DESTINATION_WALLET'));
 
-        // Get or create user's MMP token account
-        const userMmpTokenAccount = await getAssociatedTokenAddress(
-          mmpMint,
-          userPublicKey
-        );
-
-        // Check if user's MMP token account exists
-        const userMmpAccountInfo = await this.connection.getAccountInfo(userMmpTokenAccount);
-        if (!userMmpAccountInfo) {
-          // Create user's MMP token account if it doesn't exist
-          transaction.add(
-            createAssociatedTokenAccountInstruction(
-              userPublicKey,
-              userMmpTokenAccount,
-              userPublicKey,
-              mmpMint
-            )
-          );
-        }
-
-        // Handle input token transfer
         if (dto.input_token === TokenType.SOL) {
-          // For SOL, transfer to swap pool
+          // Chuyển SOL - chuyển đổi thành lamports (số nguyên)
+          const lamports = Math.floor(dto.input_amount * 1e9);
           transaction.add(
             SystemProgram.transfer({
-              fromPubkey: userPublicKey,
-              toPubkey: new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')),
-              lamports: dto.input_amount * 1e9, // Convert SOL to lamports
+              fromPubkey: userKeypair.publicKey,
+              toPubkey: destinationPublicKey,
+              lamports: lamports,
             })
           );
         } else {
-          // For SPL tokens (USDT, USDC)
-          const inputMint = new PublicKey(this.configService.get(`${dto.input_token}_MINT`));
-          const inputTokenAccount = await this.connection.getTokenAccountsByOwner(
-            userPublicKey,
-            { mint: inputMint }
+          // Chuyển SPL token (USDT, USDC) - chuyển đổi thành số nguyên dựa trên decimals
+          const mint = new PublicKey(mintAddress);
+          const transferAmount = Math.floor(dto.input_amount * Math.pow(10, tokenDecimals));
+          
+          // Lấy hoặc tạo token account của ví đích
+          const destinationTokenAccount = await getAssociatedTokenAddress(
+            mint,
+            destinationPublicKey
           );
 
-          if (inputTokenAccount.value.length === 0) {
-            throw new BadRequestException(`No ${dto.input_token} token account found`);
+          // Kiểm tra xem ví đích đã có token account chưa
+          const destinationAccountInfo = await this.connection.getAccountInfo(destinationTokenAccount);
+          if (!destinationAccountInfo) {
+            // Tạo token account cho ví đích nếu chưa có
+            transaction.add(
+              createAssociatedTokenAccountInstruction(
+                userKeypair.publicKey, // user trả phí tạo ATA
+                destinationTokenAccount,
+                destinationPublicKey,
+                mint
+              )
+            );
           }
 
-          transaction.add(
-            createTransferInstruction(
-              inputTokenAccount.value[0].pubkey,
-              new PublicKey(this.configService.get('SWAP_POOL_ADDRESS')),
-              userPublicKey,
-              dto.input_amount
-            )
-          );
+          // Chuyển token từ user đến ví đích
+          if (userTokenAccount) {
+            transaction.add(
+              createTransferInstruction(
+                userTokenAccount,
+                destinationTokenAccount,
+                userKeypair.publicKey,
+                transferAmount // Sử dụng số nguyên đã chuyển đổi
+              )
+            );
+          } else {
+            throw new BadRequestException(`No ${dto.input_token} token account found`);
+          }
         }
 
-        // Mint MMP tokens to user
-        transaction.add(
-          createMintToInstruction(
-            mmpMint,
-            userMmpTokenAccount,
-            this.swapPoolAuthority.publicKey,
-            mmpAmount
-          )
-        );
+        // Lấy blockhash mới cho transaction
+        const { blockhash } = await this.connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = userKeypair.publicKey;
 
-        // Send and confirm transaction
+        // Gửi và xác nhận transaction sử dụng userKeypair
         const txHash = await sendAndConfirmTransaction(
           this.connection,
           transaction,
-          [this.swapPoolAuthority]
+          [userKeypair], // Sử dụng private key của user để ký
+          {
+            commitment: 'confirmed',
+            preflightCommitment: 'confirmed'
+          }
         );
 
-        // Update order status
+        // 8. Gửi token MMP01 cho user
+        const mmp01TxHash = await this.sendMMP01Tokens(wallet.sol_address, usdValue);
+
+        // 9. Cập nhật trạng thái order thành COMPLETED
         savedOrder.status = SwapOrderStatus.COMPLETED;
-        savedOrder.tx_hash_ref = txHash;
+        savedOrder.tx_hash_send = txHash;
+        savedOrder.tx_hash_ref = mmp01TxHash;
         await this.swapOrderRepository.save(savedOrder);
 
         return savedOrder;
       } catch (error) {
-        this.logger.error(`Error executing swap: ${error.message}`);
+        this.logger.error(`Error executing transfer: ${error.message}`);
         savedOrder.status = SwapOrderStatus.FAILED;
         await this.swapOrderRepository.save(savedOrder);
-        throw new BadRequestException(`Swap failed: ${error.message}`);
+        throw new BadRequestException(`Transfer failed: ${error.message}`);
       }
     } catch (error) {
       this.logger.error(`Error creating swap order: ${error.message}`);
