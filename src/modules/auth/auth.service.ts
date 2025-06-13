@@ -8,10 +8,12 @@ import { User } from '../users/user.entity';
 import { Wallet } from '../wallets/wallet.entity';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { GoogleLoginDto, LoginResponse, AddGoogleAuthResponseDto } from './dto/auth.dto';
+import { GoogleLoginDto, LoginResponse, AddGoogleAuthResponseDto, PhantomLoginDto } from './dto/auth.dto';
 import { GoogleAuthService } from './google-auth.service';
 import * as speakeasy from 'speakeasy';
 import { TelegramBotService } from '../../shared/telegram-bot/telegram-bot.service';
+import nacl from 'tweetnacl';
+import { PublicKey } from '@solana/web3.js';
 
 @Injectable()
 export class AuthService {
@@ -462,5 +464,71 @@ export class AuthService {
         } catch (error) {
             throw new BadRequestException(error.message || 'Failed to verify email');
         }
+    }
+
+    async handlePhantomLogin(loginData: PhantomLoginDto, res: Response): Promise<LoginResponse> {
+        const { publicKey, signature } = loginData;
+        if (!publicKey || !signature) {
+            throw new BadRequestException('Missing publicKey or signature');
+        }
+
+        // Chuỗi message mà frontend phải ký (nên cố định, ví dụ: "Login to MMP-Marketing")
+        const message = 'Login to MMP-Marketing';
+        let isValid = false;
+        try {
+            const pubKey = new PublicKey(publicKey);
+            const signatureUint8 = bs58.decode(signature);
+            const messageUint8 = Buffer.from(message);
+            isValid = nacl.sign.detached.verify(messageUint8, signatureUint8, pubKey.toBytes());
+        } catch (e) {
+            throw new BadRequestException('Invalid publicKey or signature format');
+        }
+        if (!isValid) {
+            throw new BadRequestException('Invalid signature');
+        }
+
+        // Tìm wallet theo publicKey
+        let wallet = await this.walletRepository.findOne({ where: { sol_address: publicKey } });
+        let user: User | null = null;
+        let isNewUser = false;
+        if (wallet) {
+            if (wallet.user_id) {
+                user = await this.userRepository.findOne({ where: { id: wallet.user_id } });
+            }
+        }
+        if (!user) {
+            // Tạo user mới
+            user = this.userRepository.create({});
+            await this.userRepository.save(user);
+            isNewUser = true;
+            if (!wallet) {
+                wallet = this.walletRepository.create({
+                    user_id: user.id,
+                    sol_address: publicKey,
+                    private_key: null,
+                });
+                await this.walletRepository.save(wallet);
+            } else {
+                wallet.user_id = user.id;
+                await this.walletRepository.save(wallet);
+            }
+        }
+
+        // Tạo JWT
+        const payload = {
+            user_id: user.id,
+            wallet_id: wallet.id,
+        };
+        const accessToken = this.jwtService.sign(payload);
+        res.cookie('access_token', accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'none',
+            maxAge: parseInt(process.env.COOKIE_EXPIRES_IN) * 1000,
+        });
+        return {
+            status: true,
+            message: isNewUser ? 'Account created and login successful' : 'Login successful',
+        };
     }
 }

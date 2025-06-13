@@ -29,3 +29,8 @@ export interface SendEmailVerificationDto {
 export interface VerifyEmailCodeDto {
     code: string;
 }
+
+export interface PhantomLoginDto {
+    publicKey: string; // Địa chỉ ví Solana
+    signature: string; // Chữ ký xác thực
+}

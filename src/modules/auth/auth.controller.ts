@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Res, HttpStatus, HttpCode, UseGuards, Request, Delete, Get } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
-import { AddGoogleAuthResponseDto, GoogleLoginDto, LoginResponse, VerifyGoogleAuthDto, AddEmailAuthDto, SendEmailVerificationDto, VerifyEmailCodeDto } from './dto/auth.dto';
+import { AddGoogleAuthResponseDto, GoogleLoginDto, LoginResponse, VerifyGoogleAuthDto, AddEmailAuthDto, SendEmailVerificationDto, VerifyEmailCodeDto, PhantomLoginDto } from './dto/auth.dto';
 import { JwtGuestGuard } from './jwt-guest.guard';
 
 @Controller('auth')
@@ -61,5 +61,10 @@ export class AuthController {
     @UseGuards(JwtGuestGuard)
     async verifyEmailCode(@Request() req, @Body() dto: VerifyEmailCodeDto): Promise<LoginResponse> {
         return await this.authService.handleVerifyTeleCode(req.user.user.id, dto.code);
+    }
+
+    @Post('login-phantom')
+    async loginWithPhantom(@Body() body: PhantomLoginDto, @Res({ passthrough: true }) res: Response): Promise<LoginResponse> {
+        return await this.authService.handlePhantomLogin(body, res);
     }
 }
