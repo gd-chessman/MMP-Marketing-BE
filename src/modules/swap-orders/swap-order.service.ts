@@ -573,10 +573,28 @@ export class SwapOrderService {
       }
 
       // 2. Lấy transaction details từ blockchain
-      const txDetail = await this.connection.getTransaction(dto.signature, {
-        commitment: 'confirmed',
-        maxSupportedTransactionVersion: 0
-      });
+      let txDetail = null;
+      let retryCount = 0;
+      const maxRetries = 2;
+      const retryDelay = 1200; // 1.2 seconds
+
+      while (retryCount <= maxRetries) {
+        txDetail = await this.connection.getTransaction(dto.signature, {
+          commitment: 'confirmed',
+          maxSupportedTransactionVersion: 0
+        });
+
+        if (txDetail) {
+          break;
+        }
+
+        if (retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          retryCount++;
+        } else {
+          throw new BadRequestException('Transaction not found on blockchain after retries');
+        }
+      }
 
       if (!txDetail) {
         throw new BadRequestException('Transaction not found on blockchain');
