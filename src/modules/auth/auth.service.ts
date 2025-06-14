@@ -472,6 +472,19 @@ export class AuthService {
             throw new BadRequestException('Missing signature, public_key, or message');
         }
 
+        // Kiểm tra message có đúng định dạng và timestamp hợp lệ không
+        const messageRegex = /^Login to MMP Platform - (\d+)$/;
+        const match = message.match(messageRegex);
+        if (!match) {
+            throw new BadRequestException('Invalid message format');
+        }
+        const timestamp = parseInt(match[1], 10);
+        const now = Date.now();
+        const maxDelay = 2 * 60 * 1000; // 2 phút
+        if (isNaN(timestamp) || Math.abs(now - timestamp) > maxDelay) {
+            throw new BadRequestException('Message expired');
+        }
+
         try {
             // 1. Xác thực chữ ký
             const isValid = nacl.sign.detached.verify(
