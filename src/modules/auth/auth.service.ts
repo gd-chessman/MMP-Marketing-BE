@@ -28,7 +28,7 @@ export class AuthService {
         @InjectRepository(User)
         private userRepository: Repository<User>,
         @InjectRepository(Wallet)
-        private walletRepository: Repository<Wallet>,
+        private walletRepository: Repository<Wallet>
     ) {}
 
     private generateSolanaWallet() {
@@ -467,38 +467,30 @@ export class AuthService {
     }
 
     async handlePhantomLogin(loginData: PhantomLoginDto, res: Response): Promise<LoginResponse> {
-        const { signature } = loginData;
-        if (!signature) {
-            throw new BadRequestException('Missing signature');
+        const { signature, public_key, message } = loginData;
+        if (!signature || !public_key || !message) {
+            throw new BadRequestException('Missing signature, public_key, or message');
         }
 
         try {
-            let signatureUint8: Uint8Array;
-            
-            // Xử lý signature dạng string
-            if (typeof signature === 'string') {
-                signatureUint8 = bs58.decode(signature);
-            } 
-            // Xử lý signature dạng mảng số
-            else if (Array.isArray(signature)) {
-                signatureUint8 = new Uint8Array(signature);
-            } else {
-                throw new BadRequestException('Invalid signature format');
+            // 1. Xác thực chữ ký
+            const isValid = nacl.sign.detached.verify(
+                Buffer.from(message),
+                Buffer.from(signature),
+                bs58.decode(public_key)
+            );
+            if (!isValid) {
+                throw new BadRequestException('Invalid signature');
             }
 
-            // Lấy public key từ 32 bytes đầu của signature
-            const publicKey = new PublicKey(signatureUint8.slice(0, 32));
-            const solAddress = publicKey.toString();
-
-            // Kiểm tra xem đã có wallet với sol_address này chưa
+            const solAddress = public_key;
+            // 2. Kiểm tra xem đã có wallet với sol_address này chưa
             let wallet = await this.walletRepository.findOne({
                 where: { sol_address: solAddress }
             });
 
             if (!wallet) {
-                // Nếu chưa có wallet, tạo user mới
-
-                // Tạo wallet mới với sol_address từ publicKey
+                // Nếu chưa có wallet, tạo mới
                 wallet = this.walletRepository.create({
                     user_id: null,
                     sol_address: solAddress,
@@ -507,7 +499,7 @@ export class AuthService {
                 await this.walletRepository.save(wallet);
             }
 
-            // Tạo JWT chỉ với wallet_id
+            // 3. Tạo JWT chỉ với wallet_id
             const payload = {
                 wallet_id: wallet.id,
             };

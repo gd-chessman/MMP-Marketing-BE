@@ -1,3 +1,5 @@
+import { IsArray, IsNumber, IsString } from 'class-validator';
+
 export interface GoogleLoginDto {
     code: string;  // Authorization code from Google
 }
@@ -30,6 +32,14 @@ export interface VerifyEmailCodeDto {
     code: string;
 }
 
-export interface PhantomLoginDto {
-    signature: number[]; // Chữ ký xác thực dạng mảng số
+export class PhantomLoginDto {
+    @IsArray()
+    @IsNumber({}, { each: true })
+    signature: number[];
+
+    @IsString()
+    public_key: string;
+
+    @IsString()
+    message: string;
 }
