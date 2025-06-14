@@ -773,23 +773,21 @@ export class SwapOrderService {
                 this.logger.warn(`[completeWeb3Wallet] Source or destination account not found`);
                 return false;
               }
-              
+
+              // Get token account info to verify mint
               try {
-                const destinationAccountInfo = await this.connection.getAccountInfo(destinationAccount);
-                if (destinationAccountInfo) {
-                  const tokenAccountData = destinationAccountInfo.data;
-                  if (tokenAccountData && tokenAccountData.length >= 72) {
-                    const mintBytes = tokenAccountData.slice(0, 32);
-                    actualMint = new PublicKey(mintBytes).toString();
+                const sourceAccountInfo = await this.connection.getParsedAccountInfo(sourceAccount);
+                if (sourceAccountInfo.value && 'parsed' in sourceAccountInfo.value.data) {
+                  const tokenAccountData = sourceAccountInfo.value.data.parsed.info;
+                  actualMint = tokenAccountData.mint;
+                  
+                  const expectedMint = this.TOKEN_MINT_ADDRESSES[order.input_token];
+                  if (actualMint === expectedMint) {
+                    const decimals = tokenAccountData.tokenAmount.decimals;
+                    actualAmount = amount / Math.pow(10, decimals);
                     
-                    const expectedMint = this.TOKEN_MINT_ADDRESSES[order.input_token];
-                    if (actualMint === expectedMint) {
-                      const decimals = await this.getTokenDecimals(new PublicKey(actualMint));
-                      actualAmount = amount / Math.pow(10, decimals);
-                      
-                      this.logger.log(`[completeWeb3Wallet] Valid SPL transfer: ${actualAmount} tokens (mint: ${actualMint}) to ${destinationWallet}`);
-                      return true;
-                    }
+                    this.logger.log(`[completeWeb3Wallet] Valid SPL transfer: ${actualAmount} tokens (mint: ${actualMint})`);
+                    return true;
                   }
                 }
               } catch (error) {
