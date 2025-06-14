@@ -572,6 +572,14 @@ export class SwapOrderService {
         throw new BadRequestException('Order is not in pending status');
       }
 
+      // Check order timeout
+      const orderAge = Date.now() - order.created_at.getTime();
+      if (orderAge > 3 * 60 * 1000) { // 3 minutes in milliseconds
+        order.status = SwapOrderStatus.FAILED;
+        await this.swapOrderRepository.save(order);
+        throw new BadRequestException('Order has expired');
+      }
+
       // 2. Lấy transaction details từ blockchain
       let txDetail = null;
       let retryCount = 0;
