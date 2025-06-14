@@ -559,76 +559,52 @@ export class SwapOrderService {
 
   async completeWeb3Wallet(dto: CompleteWeb3WalletDto): Promise<SwapOrder> {
     try {
-      this.logger.log(`[completeWeb3Wallet] Starting process for orderId: ${dto.orderId}, signature: ${dto.signature}`);
-
       // 1. Tìm order
       const order = await this.swapOrderRepository.findOne({
         where: { id: dto.orderId }
       });
 
       if (!order) {
-        this.logger.error(`[completeWeb3Wallet] Order not found with id: ${dto.orderId}`);
         throw new BadRequestException('Order not found');
       }
 
-      this.logger.log(`[completeWeb3Wallet] Found order: ${JSON.stringify({
-        id: order.id,
-        status: order.status,
-        input_token: order.input_token,
-        input_amount: order.input_amount
-      })}`);
-
       if (order.status !== SwapOrderStatus.PENDING) {
-        this.logger.error(`[completeWeb3Wallet] Invalid order status: ${order.status}, expected: ${SwapOrderStatus.PENDING}`);
         throw new BadRequestException('Order is not in pending status');
       }
 
       // 2. Lấy transaction details từ blockchain
-      this.logger.log(`[completeWeb3Wallet] Fetching transaction details for signature: ${dto.signature}`);
       const txDetail = await this.connection.getTransaction(dto.signature, {
         commitment: 'confirmed',
         maxSupportedTransactionVersion: 0
       });
 
       if (!txDetail) {
-        this.logger.error(`[completeWeb3Wallet] Transaction not found on blockchain: ${dto.signature}`);
         throw new BadRequestException('Transaction not found on blockchain');
       }
 
-      this.logger.log(`[completeWeb3Wallet] Transaction details: ${JSON.stringify(txDetail)}`);
-
       if (!txDetail.transaction) {
-        this.logger.error(`[completeWeb3Wallet] Invalid transaction data for signature: ${dto.signature}`);
         throw new BadRequestException('Invalid transaction data');
       }
 
       // 3. Verify signatures
-      this.logger.log(`[completeWeb3Wallet] Verifying transaction signatures`);
       try {
         const signatures = txDetail.transaction.signatures;
         if (!signatures || signatures.length === 0) {
-          this.logger.error(`[completeWeb3Wallet] No signatures found in transaction`);
           throw new BadRequestException('Transaction has no signatures');
         }
         
         if (txDetail.meta && txDetail.meta.err) {
-          this.logger.error(`[completeWeb3Wallet] Transaction failed on blockchain: ${JSON.stringify(txDetail.meta.err)}`);
           throw new BadRequestException('Transaction failed on blockchain');
         }
-        
-        this.logger.log(`[completeWeb3Wallet] Transaction signatures verified successfully`);
       } catch (error) {
-        this.logger.error(`[completeWeb3Wallet] Signature verification error: ${error.message}`);
         throw new BadRequestException('Invalid transaction signatures');
       }
 
       // 4. Validate transaction fields
       const accountKeys = txDetail.transaction.message.getAccountKeys();
       const accountKeysArray = accountKeys.keySegments().flat();
-      this.logger.log(`[completeWeb3Wallet] Account keys: ${JSON.stringify(accountKeysArray.map(key => key.toString()))}`);
       
       if (!accountKeysArray || accountKeysArray.length === 0) {
-        this.logger.error(`[completeWeb3Wallet] No account keys found in transaction`);
         throw new BadRequestException('Invalid transaction: no account keys found');
       }
 
@@ -636,34 +612,20 @@ export class SwapOrderService {
       const feePayerIndex = txDetail.transaction.message.header.numRequiredSignatures - 1;
       const userPublicKey = accountKeysArray[feePayerIndex];
       
-      this.logger.log(`[completeWeb3Wallet] Fee payer index: ${feePayerIndex}, public key: ${userPublicKey.toString()}`);
-      
       if (!userPublicKey) {
-        this.logger.error(`[completeWeb3Wallet] User public key is undefined at index ${feePayerIndex}`);
         throw new BadRequestException('Invalid transaction: user public key not found');
       }
 
       const destinationWallet = this.configService.get('DESTINATION_WALLET');
       if (!destinationWallet) {
-        this.logger.error(`[completeWeb3Wallet] Destination wallet not configured`);
         throw new BadRequestException('System configuration error: destination wallet not set');
       }
-      
-      this.logger.log(`[completeWeb3Wallet] Transaction details: ${JSON.stringify({
-        userPublicKey: userPublicKey.toString(),
-        destinationWallet,
-        numSignatures: txDetail.transaction.message.header.numRequiredSignatures,
-        accountKeysCount: accountKeysArray.length,
-        feePayerIndex
-      })}`);
 
       if (!txDetail.transaction.message.header.numRequiredSignatures) {
-        this.logger.error(`[completeWeb3Wallet] Missing required signatures in transaction`);
         throw new BadRequestException('Transaction missing required signatures');
       }
 
       // 5. Validate instruction chi tiết
-      this.logger.log(`[completeWeb3Wallet] Validating transaction instructions`);
       let isValidInstruction = false;
       let actualAmount = 0;
       let actualMint = '';
@@ -673,8 +635,6 @@ export class SwapOrderService {
         const preBalances = txDetail.meta.preBalances;
         const postBalances = txDetail.meta.postBalances;
         
-        this.logger.log(`[completeWeb3Wallet] Checking balance changes: pre=${preBalances}, post=${postBalances}`);
-        
         // Tìm account có thay đổi balance
         for (let i = 0; i < preBalances.length; i++) {
           const preBalance = preBalances[i];
@@ -682,18 +642,14 @@ export class SwapOrderService {
           const accountKey = accountKeysArray[i];
           
           if (preBalance !== postBalance) {
-            this.logger.log(`[completeWeb3Wallet] Found balance change for account ${accountKey.toString()}: ${preBalance} -> ${postBalance}`);
-            
             // Nếu là SOL transfer
             if (order.input_token === TokenType.SOL) {
               const balanceChange = (preBalance - postBalance) / 1e9; // Convert lamports to SOL
-              this.logger.log(`[completeWeb3Wallet] SOL balance change: ${balanceChange} SOL`);
               
               // Kiểm tra nếu account là destination wallet
               if (accountKey.toString() === destinationWallet) {
                 actualAmount = balanceChange;
                 isValidInstruction = true;
-                this.logger.log(`[completeWeb3Wallet] Valid SOL transfer detected: ${actualAmount} SOL to ${destinationWallet}`);
                 break;
               }
             }
@@ -706,25 +662,14 @@ export class SwapOrderService {
         const message = txDetail.transaction.message;
         const instructions = message.compiledInstructions || [];
         const innerInstructions = txDetail.meta?.innerInstructions || [];
-        
-        this.logger.log(`[completeWeb3Wallet] Number of main instructions: ${instructions.length}`);
-        this.logger.log(`[completeWeb3Wallet] Number of inner instructions: ${innerInstructions.length}`);
 
         // Hàm helper để xử lý instruction
         const processInstruction = async (instruction: any, isInner: boolean = false) => {
           const programIdIndex = instruction.programIdIndex;
-          if (programIdIndex === undefined) {
-            this.logger.warn(`[completeWeb3Wallet] ${isInner ? 'Inner ' : ''}Instruction missing programIdIndex`);
-            return false;
-          }
+          if (programIdIndex === undefined) return false;
 
           const programId = accountKeysArray[programIdIndex];
-          if (!programId) {
-            this.logger.warn(`[completeWeb3Wallet] Program ID not found at index ${programIdIndex}`);
-            return false;
-          }
-
-          this.logger.log(`[completeWeb3Wallet] Processing ${isInner ? 'inner ' : ''}instruction with programId: ${programId.toString()}`);
+          if (!programId) return false;
           
           if (programId.equals(SystemProgram.programId)) {
             // SOL transfer instruction
@@ -735,19 +680,12 @@ export class SwapOrderService {
               actualAmount = lamports / 1e9;
               
               const toPubkeyIndex = instruction.accountKeyIndexes[1];
-              if (toPubkeyIndex === undefined) {
-                this.logger.warn(`[completeWeb3Wallet] Missing destination account index in SOL transfer`);
-                return false;
-              }
+              if (toPubkeyIndex === undefined) return false;
 
               const toPubkey = accountKeysArray[toPubkeyIndex];
-              if (!toPubkey) {
-                this.logger.warn(`[completeWeb3Wallet] Destination account not found at index ${toPubkeyIndex}`);
-                return false;
-              }
+              if (!toPubkey) return false;
 
               if (toPubkey.toString() === destinationWallet) {
-                this.logger.log(`[completeWeb3Wallet] Valid SOL transfer: ${actualAmount} SOL to ${destinationWallet}`);
                 return true;
               }
             }
@@ -761,18 +699,12 @@ export class SwapOrderService {
               const sourceAccountIndex = instruction.accountKeyIndexes[1];
               const destinationAccountIndex = instruction.accountKeyIndexes[2];
               
-              if (sourceAccountIndex === undefined || destinationAccountIndex === undefined) {
-                this.logger.warn(`[completeWeb3Wallet] Missing account indices in SPL transfer`);
-                return false;
-              }
+              if (sourceAccountIndex === undefined || destinationAccountIndex === undefined) return false;
 
               const sourceAccount = accountKeysArray[sourceAccountIndex];
               const destinationAccount = accountKeysArray[destinationAccountIndex];
               
-              if (!sourceAccount || !destinationAccount) {
-                this.logger.warn(`[completeWeb3Wallet] Source or destination account not found`);
-                return false;
-              }
+              if (!sourceAccount || !destinationAccount) return false;
 
               // Get token account info to verify mint
               try {
@@ -785,13 +717,11 @@ export class SwapOrderService {
                   if (actualMint === expectedMint) {
                     const decimals = tokenAccountData.tokenAmount.decimals;
                     actualAmount = amount / Math.pow(10, decimals);
-                    
-                    this.logger.log(`[completeWeb3Wallet] Valid SPL transfer: ${actualAmount} tokens (mint: ${actualMint})`);
                     return true;
                   }
                 }
               } catch (error) {
-                this.logger.warn(`[completeWeb3Wallet] Could not validate SPL transfer details: ${error.message}`);
+                return false;
               }
             }
           }
@@ -823,26 +753,21 @@ export class SwapOrderService {
       }
 
       if (!isValidInstruction) {
-        this.logger.error(`[completeWeb3Wallet] Invalid transfer instruction in transaction`);
         throw new BadRequestException('Invalid transfer instruction in transaction');
       }
 
       // 6. Kiểm tra amount
       const tolerance = 0.000001;
-      this.logger.log(`[completeWeb3Wallet] Validating amount: expected ${order.input_amount}, actual ${actualAmount}`);
-      // if (Math.abs(actualAmount - order.input_amount) > tolerance) {
-      //   this.logger.error(`[completeWeb3Wallet] Amount mismatch: expected ${order.input_amount}, got ${actualAmount}`);
-      //   throw new BadRequestException(`Amount mismatch: expected ${order.input_amount}, got ${actualAmount}`);
-      // }
+      if (Math.abs(actualAmount - order.input_amount) > tolerance) {
+        throw new BadRequestException(`Amount mismatch: expected ${order.input_amount}, got ${actualAmount}`);
+      }
 
       // 7. Kiểm tra và tạo wallet
-      this.logger.log(`[completeWeb3Wallet] Checking wallet for public key: ${userPublicKey.toString()}`);
       let wallet = await this.walletRepository.findOne({
         where: { sol_address: userPublicKey.toString() }
       });
 
       if (!wallet) {
-        this.logger.log(`[completeWeb3Wallet] Creating new wallet for public key: ${userPublicKey.toString()}`);
         wallet = this.walletRepository.create({
           user_id: null,
           sol_address: userPublicKey.toString(),
@@ -851,37 +776,24 @@ export class SwapOrderService {
           balance_mmp: 0
         });
         wallet = await this.walletRepository.save(wallet);
-        this.logger.log(`[completeWeb3Wallet] Created new wallet with id: ${wallet.id}`);
       }
 
       // 8. Cập nhật swap order với wallet_id
       order.wallet_id = wallet.id;
       await this.swapOrderRepository.save(order);
-      this.logger.log(`[completeWeb3Wallet] Updated order with wallet_id: ${wallet.id}`);
 
       // 9. Tính toán giá trị USD và gửi MMP01 tokens
       const usdValue = await this.calculateUSDValue(order.input_token, order.input_amount);
-      this.logger.log(`[completeWeb3Wallet] Calculated USD value: ${usdValue}`);
-      
-      this.logger.log(`[completeWeb3Wallet] Sending MMP01 tokens to ${userPublicKey.toString()}`);
       const mmp01TxHash = await this.sendMMP01Tokens(userPublicKey.toString(), usdValue);
-      this.logger.log(`[completeWeb3Wallet] MMP01 tokens sent successfully, txHash: ${mmp01TxHash}`);
 
       // 10. Cập nhật order
       order.status = SwapOrderStatus.COMPLETED;
       order.tx_hash_send = dto.signature;
       order.tx_hash_ref = mmp01TxHash;
       await this.swapOrderRepository.save(order);
-      this.logger.log(`[completeWeb3Wallet] Order completed successfully: ${JSON.stringify({
-        orderId: order.id,
-        status: order.status,
-        tx_hash_send: order.tx_hash_send,
-        tx_hash_ref: order.tx_hash_ref
-      })}`);
 
       return order;
     } catch (error) {
-      this.logger.error(`[completeWeb3Wallet] Error completing web3 wallet swap: ${error.message}`);
       throw new BadRequestException(error.message);
     }
   }
