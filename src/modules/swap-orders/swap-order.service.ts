@@ -469,7 +469,7 @@ export class SwapOrderService {
 
       // 6. Tạo và lưu swap order với trạng thái PENDING
       const swapOrder = this.swapOrderRepository.create({
-        wallet_id: 0, // Web3 wallet không có wallet_id
+        wallet_id: null, // Web3 wallet không có wallet_id
         input_token: dto.inputToken,
         input_amount: dto.inputAmount,
         mmp_received: mmp01Amount,

@@ -19,10 +19,10 @@ export class SwapOrder {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'int', nullable: true })
   wallet_id: number;
 
-  @ManyToOne(() => Wallet)
+  @ManyToOne(() => Wallet, { nullable: true })
   @JoinColumn({ name: 'wallet_id' })
   wallet: Wallet;
 
