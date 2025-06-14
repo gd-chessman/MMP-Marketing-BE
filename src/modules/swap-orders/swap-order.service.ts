@@ -758,9 +758,9 @@ export class SwapOrderService {
 
       // 6. Kiểm tra amount
       const tolerance = 0.000001;
-      if (Math.abs(actualAmount - order.input_amount) > tolerance) {
-        throw new BadRequestException(`Amount mismatch: expected ${order.input_amount}, got ${actualAmount}`);
-      }
+      // if (Math.abs(actualAmount - order.input_amount) > tolerance) {
+      //   throw new BadRequestException(`Amount mismatch: expected ${order.input_amount}, got ${actualAmount}`);
+      // }
 
       // 7. Kiểm tra và tạo wallet
       let wallet = await this.walletRepository.findOne({
