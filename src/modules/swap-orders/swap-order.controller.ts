@@ -23,11 +23,13 @@ export class SwapOrderController {
     return this.swapOrderService.findByWalletId(req.user.wallet.id);
   }
 
+  @UseGuards(JwtGuestGuard)
   @Post('web3-wallet')
-  async initWeb3Wallet(@Body() dto: InitWeb3WalletDto) {
-    return this.swapOrderService.initWeb3Wallet(dto);
+  async initWeb3Wallet(@Body() dto: InitWeb3WalletDto, @Req() req: any) {
+    return this.swapOrderService.initWeb3Wallet(dto, req.user.wallet);
   }
 
+  @UseGuards(JwtGuestGuard)
   @Post('web3-wallet/complete')
   async completeWeb3Wallet(@Body() dto: CompleteWeb3WalletDto) {
     return this.swapOrderService.completeWeb3Wallet(dto);

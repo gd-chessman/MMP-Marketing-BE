@@ -411,7 +411,7 @@ export class SwapOrderService {
     });
   }
 
-  async initWeb3Wallet(dto: InitWeb3WalletDto): Promise<{ orderId: number; serializedTx: string }> {
+  async initWeb3Wallet(dto: InitWeb3WalletDto, wallet: any): Promise<{ orderId: number; serializedTx: string }> {
     try {
       // 1. Validate input
       if (dto.inputAmount <= 0) {
@@ -472,7 +472,7 @@ export class SwapOrderService {
 
       // 6. Tạo và lưu swap order với trạng thái PENDING
       const swapOrder = this.swapOrderRepository.create({
-        wallet_id: null, // Web3 wallet không có wallet_id
+        wallet_id: wallet.id, // Sử dụng wallet_id từ JWT
         input_token: dto.inputToken,
         input_amount: dto.inputAmount,
         mmp_received: mmp01Amount,
