@@ -403,7 +403,10 @@ export class SwapOrderService {
 
   async findByWalletId(walletId: number): Promise<SwapOrder[]> {
     return this.swapOrderRepository.find({
-      where: { wallet_id: walletId },
+      where: { 
+        wallet_id: walletId,
+        status: SwapOrderStatus.COMPLETED 
+      },
       order: { created_at: 'DESC' }
     });
   }
