@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Connection, PublicKey, Transaction, sendAndConfirmTransaction, Keypair, SystemProgram } from '@solana/web3.js';
-import { SwapOrder, TokenType, SwapOrderStatus } from './swap-order.entity';
+import { SwapOrder, TokenType, SwapOrderStatus, OutputTokenType } from './swap-order.entity';
 import { Wallet } from '../wallets/wallet.entity';
 import { CreateSwapOrderDto, InitWeb3WalletDto, CompleteWeb3WalletDto } from './dto/create-swap-order.dto';
 import { TOKEN_PROGRAM_ID, getMint, createMintToInstruction, createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
@@ -15,6 +15,7 @@ export class SwapOrderService {
   private readonly logger = new Logger(SwapOrderService.name);
   private readonly connection: Connection;
   private readonly mmpAuthorityKeypair: Keypair;
+  private readonly mpbAuthorityKeypair: Keypair;
 
   // Cache cho giá SOL
   private solPriceCache: { price: number; timestamp: number } | null = null;
@@ -29,6 +30,9 @@ export class SwapOrderService {
 
   // Giá MMP01 token (1 MMP01 = 0.001 $)
   private readonly MMP01_PRICE_USD = 0.001;
+
+  // Giá MPB token (1 MPB = 0.001 $)
+  private readonly MPB_PRICE_USD = 0.001;
 
   constructor(
     @InjectRepository(SwapOrder)
@@ -55,6 +59,24 @@ export class SwapOrderService {
     } catch (error) {
       this.logger.error(`Failed to create MMP authority keypair: ${error.message}`);
       throw new InternalServerErrorException('Failed to initialize MMP authority keypair');
+    }
+
+    // Khởi tạo MPB authority keypair từ environment
+    const mpbAuthorityPrivateKey = this.configService.get<string>('MPB_AUTHORITY_PRIVATE_KEY');
+    if (!mpbAuthorityPrivateKey) {
+      throw new InternalServerErrorException('MPB_AUTHORITY_PRIVATE_KEY is not configured');
+    }
+    
+    try {
+      const decodedKey = bs58.decode(mpbAuthorityPrivateKey);
+      if (decodedKey.length !== 64) {
+        this.logger.error(`Invalid MPB authority key size: ${decodedKey.length} bytes`);
+        throw new InternalServerErrorException('Invalid MPB authority private key size');
+      }
+      this.mpbAuthorityKeypair = Keypair.fromSecretKey(decodedKey);
+    } catch (error) {
+      this.logger.error(`Failed to create MPB authority keypair: ${error.message}`);
+      throw new InternalServerErrorException('Failed to initialize MPB authority keypair');
     }
   }
 
@@ -231,6 +253,108 @@ export class SwapOrderService {
     }
   }
 
+  /**
+   * Gửi token MPB từ ví sàn đến ví user
+   */
+  private async sendMPBTokens(userWalletAddress: string, usdValue: number): Promise<string> {
+    try {
+      // Tính số lượng MPB token cần gửi
+      const mpbAmount = Math.floor(usdValue / this.MPB_PRICE_USD);
+      
+      if (mpbAmount <= 0) {
+        throw new BadRequestException('USD value too small to receive MPB tokens');
+      }
+
+      const transaction = new Transaction();
+      const userPublicKey = new PublicKey(userWalletAddress);
+      const mpbMint = new PublicKey(this.configService.get('MPB_MINT'));
+      const authorityPublicKey = this.mpbAuthorityKeypair.publicKey;
+      
+      // Lấy thông tin mint để biết decimals
+      const mintInfo = await this.connection.getParsedAccountInfo(mpbMint);
+      let decimals = 6; // Default decimals
+      
+      if (mintInfo.value && 'parsed' in mintInfo.value.data) {
+        decimals = mintInfo.value.data.parsed.info.decimals;
+      } else {
+        // Fallback: sử dụng getMint để lấy decimals
+        try {
+          const mintData = await getMint(this.connection, mpbMint);
+          decimals = mintData.decimals;
+        } catch (error) {
+          this.logger.warn(`Could not get mint decimals, using default: ${decimals}`);
+        }
+      }
+      
+      // Chuyển đổi số lượng token thành số nguyên dựa trên decimals
+      const transferAmount = Math.floor(mpbAmount * Math.pow(10, decimals));
+      
+      this.logger.log(`Calculated transfer: ${mpbAmount} MPB tokens = ${transferAmount} raw units (decimals: ${decimals})`);
+      
+      // Lấy hoặc tạo MPB token account cho user
+      const userMpbTokenAccount = await getAssociatedTokenAddress(
+        mpbMint,
+        userPublicKey
+      );
+
+      // Lấy token account của ví sàn (authority)
+      const authorityMpbTokenAccount = await getAssociatedTokenAddress(
+        mpbMint,
+        authorityPublicKey
+      );
+
+      // Kiểm tra xem user đã có MPB token account chưa
+      const userMpbAccountInfo = await this.connection.getAccountInfo(userMpbTokenAccount);
+      if (!userMpbAccountInfo) {
+        // Tạo MPB token account cho user nếu chưa có
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            this.mpbAuthorityKeypair.publicKey, // Authority trả phí tạo ATA
+            userMpbTokenAccount,
+            userPublicKey,
+            mpbMint
+          )
+        );
+      }
+
+      // Kiểm tra balance của ví sàn
+      const authorityAccountInfo = await this.connection.getAccountInfo(authorityMpbTokenAccount);
+      if (!authorityAccountInfo) {
+        throw new BadRequestException('Authority wallet does not have MPB token account');
+      }
+
+      const authorityBalance = await this.connection.getTokenAccountBalance(authorityMpbTokenAccount);
+      const authorityBalanceRaw = authorityBalance.value.amount;
+      
+      if (parseInt(authorityBalanceRaw) < transferAmount) {
+        throw new BadRequestException(`Insufficient MPB balance in authority wallet. Available: ${authorityBalance.value.uiAmount}, Required: ${mpbAmount}`);
+      }
+
+      // Chuyển MPB tokens từ ví sàn đến user
+      transaction.add(
+        createTransferInstruction(
+          authorityMpbTokenAccount,
+          userMpbTokenAccount,
+          authorityPublicKey,
+          transferAmount
+        )
+      );
+
+      // Gửi transaction
+      const signature = await sendAndConfirmTransaction(
+        this.connection,
+        transaction,
+        [this.mpbAuthorityKeypair]
+      );
+
+      this.logger.log(`Successfully sent ${mpbAmount} MPB tokens to ${userWalletAddress}`);
+      return signature;
+    } catch (error) {
+      this.logger.error(`Failed to send MPB tokens: ${error.message}`);
+      throw new BadRequestException(`Failed to send MPB tokens: ${error.message}`);
+    }
+  }
+
   async create(wallet: any, dto: CreateSwapOrderDto): Promise<SwapOrder> {
     try {
       // 1. Validate input
@@ -300,8 +424,8 @@ export class SwapOrderService {
       const swapOrder = this.swapOrderRepository.create({
         wallet_id: wallet.id,
         input_token: dto.input_token,
+        output_token: dto.output_token,
         input_amount: dto.input_amount,
-        mmp_received: mmp01Amount,
         swap_rate: usdValue / dto.input_amount,
         status: SwapOrderStatus.PENDING
       });
@@ -379,13 +503,22 @@ export class SwapOrderService {
           }
         );
 
-        // 8. Gửi token MMP01 cho user
-        const mmp01TxHash = await this.sendMMP01Tokens(wallet.sol_address, usdValue);
+        // 8. Gửi token cho user dựa vào loại token đầu ra
+        let outputTxHash: string;
+        if (dto.output_token === OutputTokenType.MMP) {
+          outputTxHash = await this.sendMMP01Tokens(wallet.sol_address, usdValue);
+          savedOrder.mmp_received = mmp01Amount;
+        } else if (dto.output_token === OutputTokenType.MPB) {
+          outputTxHash = await this.sendMPBTokens(wallet.sol_address, usdValue);
+          savedOrder.mpb_received = usdValue / this.MPB_PRICE_USD; // Tính số lượng MPB nhận được
+        } else {
+          throw new BadRequestException(`Unsupported output token type: ${dto.output_token}`);
+        }
 
         // 9. Cập nhật trạng thái order thành COMPLETED
         savedOrder.status = SwapOrderStatus.COMPLETED;
         savedOrder.tx_hash_send = txHash;
-        savedOrder.tx_hash_ref = mmp01TxHash;
+        savedOrder.tx_hash_ref = outputTxHash;
         await this.swapOrderRepository.save(savedOrder);
 
         return savedOrder;

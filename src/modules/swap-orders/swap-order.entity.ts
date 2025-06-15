@@ -8,6 +8,11 @@ export enum TokenType {
   // Thêm các loại token khác nếu cần
 }
 
+export enum OutputTokenType {
+  MMP = 'MMP',
+  MPB = 'MPB'
+}
+
 export enum SwapOrderStatus {
   PENDING = 'pending',
   COMPLETED = 'completed',
@@ -33,11 +38,21 @@ export class SwapOrder {
   })
   input_token: TokenType;
 
+  @Column({
+    type: 'enum',
+    enum: OutputTokenType,
+    default: null
+  })
+  output_token: OutputTokenType;
+
   @Column({ type: 'decimal', precision: 20, scale: 8 })
   input_amount: number;
 
-  @Column({ type: 'decimal', precision: 20, scale: 8 })
+  @Column({ type: 'decimal', precision: 20, scale: 8, nullable: true })
   mmp_received: number;
+
+  @Column({ type: 'decimal', precision: 20, scale: 8, nullable: true })
+  mpb_received: number;
 
   @Column({ type: 'decimal', precision: 20, scale: 8 })
   swap_rate: number;

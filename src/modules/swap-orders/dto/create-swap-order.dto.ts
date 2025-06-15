@@ -1,9 +1,12 @@
 import { IsEnum, IsNumber, Min, IsString, IsNotEmpty } from 'class-validator';
-import { TokenType } from '../swap-order.entity';
+import { OutputTokenType, TokenType } from '../swap-order.entity';
 
 export class CreateSwapOrderDto {
   @IsEnum(TokenType)
   input_token: TokenType;
+
+  @IsEnum(OutputTokenType)
+  output_token: OutputTokenType;
 
   @IsNumber()
   @Min(0)
