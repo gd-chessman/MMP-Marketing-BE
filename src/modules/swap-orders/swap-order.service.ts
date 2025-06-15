@@ -601,21 +601,28 @@ export class SwapOrderService {
 
       // 5. Tính toán giá trị USD
       const usdValue = await this.calculateUSDValue(dto.inputToken, dto.inputAmount);
-      const mmp01Amount = Math.floor(usdValue / this.MMP01_PRICE_USD);
+      let outputAmount: number;
+      if (dto.outputToken === OutputTokenType.MMP) {
+        outputAmount = Math.floor(usdValue / this.MMP01_PRICE_USD);
+      } else if (dto.outputToken === OutputTokenType.MPB) {
+        outputAmount = Math.floor(usdValue / this.MPB_PRICE_USD);
+      } else {
+        throw new BadRequestException(`Unsupported output token type: ${dto.outputToken}`);
+      }
 
       // 6. Tạo và lưu swap order với trạng thái PENDING
       const swapOrder = this.swapOrderRepository.create({
         wallet_id: wallet.id, // Sử dụng wallet_id từ JWT
         input_token: dto.inputToken,
+        output_token: dto.outputToken,
         input_amount: dto.inputAmount,
-        mmp_received: mmp01Amount,
         swap_rate: usdValue / dto.inputAmount,
         status: SwapOrderStatus.PENDING
       });
 
       const savedOrder = await this.swapOrderRepository.save(swapOrder);
 
-      // 7. Build transaction unsigned
+      // 7. Tạo transaction để chuyển token
       const transaction = new Transaction();
       const destinationPublicKey = new PublicKey(this.configService.get('DESTINATION_WALLET'));
 
@@ -661,7 +668,7 @@ export class SwapOrderService {
               userTokenAccount,
               destinationTokenAccount,
               userPublicKey,
-              transferAmount
+              transferAmount // Sử dụng số nguyên đã chuyển đổi
             )
           );
         } else {
@@ -704,14 +711,6 @@ export class SwapOrderService {
       if (order.status !== SwapOrderStatus.PENDING) {
         throw new BadRequestException('Order is not in pending status');
       }
-
-      // Check order timeout
-      // const orderAge = Date.now() - order.created_at.getTime();
-      // if (orderAge > 3 * 60 * 1000) { // 3 minutes in milliseconds
-      //   order.status = SwapOrderStatus.FAILED;
-      //   await this.swapOrderRepository.save(order);
-      //   throw new BadRequestException('Order has expired');
-      // }
 
       // 2. Lấy transaction details từ blockchain
       let txDetail = null;
@@ -921,38 +920,29 @@ export class SwapOrderService {
       //   throw new BadRequestException(`Amount mismatch: expected ${order.input_amount}, got ${actualAmount}`);
       // }
 
-      // 7. Kiểm tra và tạo wallet
-      let wallet = await this.walletRepository.findOne({
-        where: { sol_address: userPublicKey.toString() }
-      });
+      // 7. Tính toán giá trị USD và gửi token
+      const usdValue = await this.calculateUSDValue(order.input_token, order.input_amount);
+      let outputTxHash: string;
 
-      if (!wallet) {
-        wallet = this.walletRepository.create({
-          user_id: null,
-          sol_address: userPublicKey.toString(),
-          private_key: null,
-          balance_sol: 0,
-          balance_mmp: 0
-        });
-        wallet = await this.walletRepository.save(wallet);
+      if (order.output_token === OutputTokenType.MMP) {
+        outputTxHash = await this.sendMMP01Tokens(userPublicKey.toString(), usdValue);
+        order.mmp_received = usdValue / this.MMP01_PRICE_USD;
+      } else if (order.output_token === OutputTokenType.MPB) {
+        outputTxHash = await this.sendMPBTokens(userPublicKey.toString(), usdValue);
+        order.mpb_received = usdValue / this.MPB_PRICE_USD;
+      } else {
+        throw new BadRequestException(`Unsupported output token type: ${order.output_token}`);
       }
 
-      // 8. Cập nhật swap order với wallet_id
-      order.wallet_id = wallet.id;
-      await this.swapOrderRepository.save(order);
-
-      // 9. Tính toán giá trị USD và gửi MMP01 tokens
-      const usdValue = await this.calculateUSDValue(order.input_token, order.input_amount);
-      const mmp01TxHash = await this.sendMMP01Tokens(userPublicKey.toString(), usdValue);
-
-      // 10. Cập nhật order
+      // 8. Cập nhật order
       order.status = SwapOrderStatus.COMPLETED;
       order.tx_hash_send = dto.signature;
-      order.tx_hash_ref = mmp01TxHash;
+      order.tx_hash_ref = outputTxHash;
       await this.swapOrderRepository.save(order);
 
       return order;
     } catch (error) {
+      this.logger.error(`Error completing web3 wallet: ${error.message}`);
       throw new BadRequestException(error.message);
     }
   }

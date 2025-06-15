@@ -21,6 +21,9 @@ export class InitWeb3WalletDto {
   @IsEnum(TokenType)
   inputToken: TokenType;
 
+  @IsEnum(OutputTokenType)
+  outputToken: OutputTokenType;
+
   @IsNumber()
   @Min(0)
   inputAmount: number;
