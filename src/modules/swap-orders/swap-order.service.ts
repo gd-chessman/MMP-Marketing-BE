@@ -186,17 +186,44 @@ export class SwapOrderService {
         userPublicKey
       );
 
+      // Thêm retry logic để kiểm tra ATA
+      let userMmp01AccountInfo = null;
+      let retryCount = 0;
+      const maxRetries = 10; // Tăng số lần retry
+      const retryDelay = 3000; // 3 second
+
+      this.logger.debug(`Starting to check MMP01 token account for user: ${userWalletAddress}`);
+      this.logger.debug(`Token account address: ${userMmp01TokenAccount.toString()}`);
+
+      while (retryCount < maxRetries) {
+        this.logger.debug(`Attempt ${retryCount + 1}/${maxRetries} to check MMP01 token account...`);
+        
+        userMmp01AccountInfo = await this.connection.getAccountInfo(
+          userMmp01TokenAccount,
+          'finalized' // Sử dụng commitment level cao hơn
+        );
+        
+        if (userMmp01AccountInfo) {
+          this.logger.debug(`MMP01 token account found after ${retryCount} retries`);
+          this.logger.debug(`Account data size: ${userMmp01AccountInfo.data.length} bytes`);
+          break;
+        }
+        
+        this.logger.debug(`Retry ${retryCount + 1}/${maxRetries}: Token account not found, waiting ${retryDelay}ms before next attempt...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        retryCount++;
+      }
+
+      if (!userMmp01AccountInfo) {
+        this.logger.error(`Failed to find MMP01 token account after ${maxRetries} attempts`);
+        throw new BadRequestException('User does not have MMP01 token account. Please create it using your wallet before swapping.');
+      }
+
       // Lấy token account của ví sàn (authority)
       const authorityMmp01TokenAccount = await getAssociatedTokenAddress(
         mmp01Mint,
         authorityPublicKey
       );
-
-      // Kiểm tra xem user đã có MMP01 token account chưa
-      const userMmp01AccountInfo = await this.connection.getAccountInfo(userMmp01TokenAccount);
-      if (!userMmp01AccountInfo) {
-        throw new BadRequestException('User does not have MMP01 token account. Please create it using your wallet before swapping.');
-      }
 
       // Kiểm tra balance của ví sàn
       const authorityAccountInfo = await this.connection.getAccountInfo(authorityMmp01TokenAccount);
@@ -289,17 +316,44 @@ export class SwapOrderService {
         userPublicKey
       );
 
+      // Thêm retry logic để kiểm tra ATA
+      let userMpbAccountInfo = null;
+      let retryCount = 0;
+      const maxRetries = 10; // Tăng số lần retry
+      const retryDelay = 3000; // 3 second
+
+      this.logger.debug(`Starting to check MPB token account for user: ${userWalletAddress}`);
+      this.logger.debug(`Token account address: ${userMpbTokenAccount.toString()}`);
+
+      while (retryCount < maxRetries) {
+        this.logger.debug(`Attempt ${retryCount + 1}/${maxRetries} to check MPB token account...`);
+        
+        userMpbAccountInfo = await this.connection.getAccountInfo(
+          userMpbTokenAccount,
+          'finalized' // Sử dụng commitment level cao hơn
+        );
+        
+        if (userMpbAccountInfo) {
+          this.logger.debug(`MPB token account found after ${retryCount} retries`);
+          this.logger.debug(`Account data size: ${userMpbAccountInfo.data.length} bytes`);
+          break;
+        }
+        
+        this.logger.debug(`Retry ${retryCount + 1}/${maxRetries}: Token account not found, waiting ${retryDelay}ms before next attempt...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        retryCount++;
+      }
+
+      if (!userMpbAccountInfo) {
+        this.logger.error(`Failed to find MPB token account after ${maxRetries} attempts`);
+        throw new BadRequestException('User does not have MPB token account. Please create it using your wallet before swapping.');
+      }
+
       // Lấy token account của ví sàn (authority)
       const authorityMpbTokenAccount = await getAssociatedTokenAddress(
         mpbMint,
         authorityPublicKey
       );
-
-      // Kiểm tra xem user đã có MPB token account chưa
-      const userMpbAccountInfo = await this.connection.getAccountInfo(userMpbTokenAccount);
-      if (!userMpbAccountInfo) {
-        throw new BadRequestException('User does not have MPB token account. Please create it using your wallet before swapping.');
-      }
 
       // Kiểm tra balance của ví sàn
       const authorityAccountInfo = await this.connection.getAccountInfo(authorityMpbTokenAccount);
