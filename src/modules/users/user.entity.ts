@@ -23,7 +23,7 @@ export class User {
   @Column({ default: false })
   is_verified_gg_auth: boolean;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', nullable: true, unique: true })
   telegram_id: string;
 
   @CreateDateColumn()

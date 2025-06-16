@@ -73,10 +73,24 @@ export class AuthService {
 
         // Create new user if not exists
         if (!user) {
-            user = this.userRepository.create({
-                telegram_id: telegramId,
-            });
-            await this.userRepository.save(user);
+            try {
+                user = this.userRepository.create({
+                    telegram_id: telegramId,
+                });
+                await this.userRepository.save(user);
+            } catch (error) {
+                if (error.code === '23505') { // PostgreSQL unique violation error code
+                    // If user was created by another request, try to fetch it again
+                    user = await this.userRepository.findOne({
+                        where: { telegram_id: telegramId }
+                    });
+                    if (!user) {
+                        this.logger.error('User already exists');
+                    }
+                } else {
+                    throw error;
+                }
+            }
         }
 
         // Check if wallet exists for user
