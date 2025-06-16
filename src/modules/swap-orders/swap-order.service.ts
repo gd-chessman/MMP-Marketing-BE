@@ -283,7 +283,7 @@ export class SwapOrderService {
       
       this.logger.log(`Calculated transfer: ${mpbAmount} MPB tokens = ${transferAmount} raw units (decimals: ${decimals})`);
       
-      // Lấy hoặc tạo MPB token account cho user
+      // Lấy MPB token account cho user
       const userMpbTokenAccount = await getAssociatedTokenAddress(
         mpbMint,
         userPublicKey
@@ -298,15 +298,7 @@ export class SwapOrderService {
       // Kiểm tra xem user đã có MPB token account chưa
       const userMpbAccountInfo = await this.connection.getAccountInfo(userMpbTokenAccount);
       if (!userMpbAccountInfo) {
-        // Tạo MPB token account cho user nếu chưa có
-        transaction.add(
-          createAssociatedTokenAccountInstruction(
-            this.mpbAuthorityKeypair.publicKey, // Authority trả phí tạo ATA
-            userMpbTokenAccount,
-            userPublicKey,
-            mpbMint
-          )
-        );
+        throw new BadRequestException('User does not have MPB token account. Please create it using your wallet before swapping.');
       }
 
       // Kiểm tra balance của ví sàn
@@ -336,7 +328,11 @@ export class SwapOrderService {
       const signature = await sendAndConfirmTransaction(
         this.connection,
         transaction,
-        [this.mpbAuthorityKeypair]
+        [this.mpbAuthorityKeypair],
+        {
+          commitment: 'confirmed',
+          preflightCommitment: 'confirmed'
+        }
       );
 
       this.logger.log(`Successfully sent ${mpbAmount} MPB tokens to ${userWalletAddress}`);
@@ -424,7 +420,78 @@ export class SwapOrderService {
 
       const savedOrder = await this.swapOrderRepository.save(swapOrder);
 
-      // 7. Thực hiện chuyển token vào ví đích
+      // 7. Kiểm tra và tạo ATA cho token output nếu cần
+      if (dto.output_token === OutputTokenType.MMP) {
+        const mmpMint = new PublicKey(this.configService.get('MMP_MINT'));
+        const userMmpTokenAccount = await getAssociatedTokenAddress(
+          mmpMint,
+          userKeypair.publicKey
+        );
+        const userMmpAccountInfo = await this.connection.getAccountInfo(userMmpTokenAccount);
+        
+        if (!userMmpAccountInfo) {
+          // Tạo ATA cho MMP01
+          const createAtaTx = new Transaction();
+          createAtaTx.add(
+            createAssociatedTokenAccountInstruction(
+              userKeypair.publicKey, // payer
+              userMmpTokenAccount, // ata
+              userKeypair.publicKey, // owner
+              mmpMint // mint
+            )
+          );
+          
+          const { blockhash: ataBlockhash } = await this.connection.getLatestBlockhash();
+          createAtaTx.recentBlockhash = ataBlockhash;
+          createAtaTx.feePayer = userKeypair.publicKey;
+          
+          await sendAndConfirmTransaction(
+            this.connection,
+            createAtaTx,
+            [userKeypair],
+            {
+              commitment: 'confirmed',
+              preflightCommitment: 'confirmed'
+            }
+          );
+        }
+      } else if (dto.output_token === OutputTokenType.MPB) {
+        const mpbMint = new PublicKey(this.configService.get('MPB_MINT'));
+        const userMpbTokenAccount = await getAssociatedTokenAddress(
+          mpbMint,
+          userKeypair.publicKey
+        );
+        const userMpbAccountInfo = await this.connection.getAccountInfo(userMpbTokenAccount);
+        
+        if (!userMpbAccountInfo) {
+          // Tạo ATA cho MPB
+          const createAtaTx = new Transaction();
+          createAtaTx.add(
+            createAssociatedTokenAccountInstruction(
+              userKeypair.publicKey, // payer
+              userMpbTokenAccount, // ata
+              userKeypair.publicKey, // owner
+              mpbMint // mint
+            )
+          );
+          
+          const { blockhash: ataBlockhash } = await this.connection.getLatestBlockhash();
+          createAtaTx.recentBlockhash = ataBlockhash;
+          createAtaTx.feePayer = userKeypair.publicKey;
+          
+          await sendAndConfirmTransaction(
+            this.connection,
+            createAtaTx,
+            [userKeypair],
+            {
+              commitment: 'confirmed',
+              preflightCommitment: 'confirmed'
+            }
+          );
+        }
+      }
+
+      // 8. Thực hiện chuyển token vào ví đích
       try {
         const transaction = new Transaction();
         const destinationPublicKey = new PublicKey(this.configService.get('DESTINATION_WALLET'));
@@ -495,7 +562,7 @@ export class SwapOrderService {
           }
         );
 
-        // 8. Gửi token cho user dựa vào loại token đầu ra
+        // 9. Gửi token cho user dựa vào loại token đầu ra
         let outputTxHash: string;
         if (dto.output_token === OutputTokenType.MMP) {
           outputTxHash = await this.sendMMP01Tokens(wallet.sol_address, usdValue);
@@ -507,7 +574,7 @@ export class SwapOrderService {
           throw new BadRequestException(`Unsupported output token type: ${dto.output_token}`);
         }
 
-        // 9. Cập nhật trạng thái order thành COMPLETED
+        // 10. Cập nhật trạng thái order thành COMPLETED
         savedOrder.status = SwapOrderStatus.COMPLETED;
         savedOrder.tx_hash_send = txHash;
         savedOrder.tx_hash_ref = outputTxHash;
