@@ -96,6 +96,27 @@ export class WalletService {
           wallet.balance_usdc = 0;
         }
 
+        // Get MPB token balance
+        const mpbMintAddress = this.configService.get('MPB_MINT');
+        if (!mpbMintAddress) {
+          this.logger.warn('MPB token mint address is not configured, skipping MPB balance check');
+          wallet.balance_mpb = 0;
+        } else {
+          const mpbTokenAccounts = await this.connection.getTokenAccountsByOwner(
+            new PublicKey(wallet.sol_address),
+            { mint: new PublicKey(mpbMintAddress) }
+          );
+
+          if (mpbTokenAccounts.value.length > 0) {
+            const tokenBalance = await this.connection.getTokenAccountBalance(
+              mpbTokenAccounts.value[0].pubkey
+            );
+            wallet.balance_mpb = tokenBalance.value.uiAmount || 0;
+          } else {
+            wallet.balance_mpb = 0;
+          }
+        }
+
         // Save updated balances to database
         return this.walletRepository.save(wallet);
       } catch (error) {

@@ -33,6 +33,9 @@ export class Wallet {
   @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
   balance_mmp: number;
 
+  @Column({ type: 'decimal', precision: 20, scale: 8, default: 0 })
+  balance_mpb: number;
+
   @CreateDateColumn()
   created_at: Date;
 } 
