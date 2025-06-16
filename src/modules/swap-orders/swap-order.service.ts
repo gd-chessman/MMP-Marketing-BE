@@ -143,9 +143,24 @@ export class SwapOrderService {
   }
 
   /**
+   * Kiểm tra số dư SOL của user
+   */
+  private async checkUserSolBalance(userPublicKey: PublicKey, needCreateATA: boolean = false): Promise<void> {
+    const balance = await this.connection.getBalance(userPublicKey);
+    const MIN_REQUIRED_SOL = needCreateATA ? 0.003 * 1e9 : 0.001 * 1e9; // 0.003 SOL nếu cần tạo ATA, 0.001 SOL nếu không
+    
+    if (balance < MIN_REQUIRED_SOL) {
+      throw new BadRequestException(
+        `Insufficient SOL balance in user wallet. Available: ${balance / 1e9} SOL, Required: ${MIN_REQUIRED_SOL / 1e9} SOL. ` +
+        'Please ensure you have enough SOL to cover transaction fees.'
+      );
+    }
+  }
+
+  /**
    * Gửi token MMP01 từ ví sàn đến ví user
    */
-  private async sendMMP01Tokens(userWalletAddress: string, usdValue: number): Promise<string> {
+  private async sendMMP01Tokens(userWalletAddress: string, usdValue: number, userKeypair: Keypair): Promise<string> {
     try {
       // Tính số lượng MMP01 token cần gửi
       const mmp01Amount = Math.floor(usdValue / this.MMP01_PRICE_USD);
@@ -155,7 +170,7 @@ export class SwapOrderService {
       }
 
       const transaction = new Transaction();
-      const userPublicKey = new PublicKey(userWalletAddress);
+      const userPublicKey = userKeypair.publicKey;
       const mmp01Mint = new PublicKey(this.configService.get('MMP_MINT'));
       const authorityPublicKey = this.mmpAuthorityKeypair.publicKey;
       
@@ -194,11 +209,24 @@ export class SwapOrderService {
 
       // Kiểm tra xem user đã có MMP01 token account chưa
       const userMmp01AccountInfo = await this.connection.getAccountInfo(userMmp01TokenAccount);
-      if (!userMmp01AccountInfo) {
+      const needCreateATA = !userMmp01AccountInfo;
+
+      // Kiểm tra số dư SOL của user
+      const userBalance = await this.connection.getBalance(userPublicKey);
+      const MIN_REQUIRED_SOL = needCreateATA ? 0.003 * 1e9 : 0.001 * 1e9; // 0.003 SOL nếu cần tạo ATA, 0.001 SOL nếu không
+      
+      if (userBalance < MIN_REQUIRED_SOL) {
+        throw new BadRequestException(
+          `Insufficient SOL balance in user wallet. Available: ${userBalance / 1e9} SOL, Required: ${MIN_REQUIRED_SOL / 1e9} SOL. ` +
+          'Please ensure you have enough SOL to cover transaction fees.'
+        );
+      }
+
+      if (needCreateATA) {
         // Tạo MMP01 token account cho user nếu chưa có
         transaction.add(
           createAssociatedTokenAccountInstruction(
-            this.mmpAuthorityKeypair.publicKey, // Authority trả phí tạo ATA
+            userPublicKey, // User trả phí tạo ATA
             userMmp01TokenAccount,
             userPublicKey,
             mmp01Mint
@@ -212,11 +240,11 @@ export class SwapOrderService {
         throw new BadRequestException('Authority wallet does not have MMP01 token account');
       }
 
-      const authorityBalance = await this.connection.getTokenAccountBalance(authorityMmp01TokenAccount);
-      const authorityBalanceRaw = authorityBalance.value.amount;
+      const authorityTokenBalance = await this.connection.getTokenAccountBalance(authorityMmp01TokenAccount);
+      const authorityBalanceRaw = authorityTokenBalance.value.amount;
       
       if (parseInt(authorityBalanceRaw) < transferAmount) {
-        throw new BadRequestException(`Insufficient MMP01 balance in authority wallet. Available: ${authorityBalance.value.uiAmount}, Required: ${mmp01Amount}`);
+        throw new BadRequestException(`Insufficient MMP01 balance in authority wallet. Available: ${authorityTokenBalance.value.uiAmount}, Required: ${mmp01Amount}`);
       }
 
       // Chuyển MMP01 tokens từ ví sàn đến user
@@ -224,7 +252,7 @@ export class SwapOrderService {
         createTransferInstruction(
           authorityMmp01TokenAccount,
           userMmp01TokenAccount,
-          this.mmpAuthorityKeypair.publicKey,
+          authorityPublicKey,
           transferAmount
         )
       );
@@ -232,13 +260,13 @@ export class SwapOrderService {
       // Lấy blockhash mới cho transaction
       const { blockhash } = await this.connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
-      transaction.feePayer = this.mmpAuthorityKeypair.publicKey;
+      transaction.feePayer = userPublicKey; // User trả phí transaction
 
-      // Gửi và xác nhận transaction
+      // Gửi và xác nhận transaction với cả chữ ký của user và authority
       const txHash = await sendAndConfirmTransaction(
         this.connection,
         transaction,
-        [this.mmpAuthorityKeypair],
+        [userKeypair, this.mmpAuthorityKeypair], // Thêm chữ ký của user
         {
           commitment: 'confirmed',
           preflightCommitment: 'confirmed'
@@ -256,7 +284,7 @@ export class SwapOrderService {
   /**
    * Gửi token MPB từ ví sàn đến ví user
    */
-  private async sendMPBTokens(userWalletAddress: string, usdValue: number): Promise<string> {
+  private async sendMPBTokens(userWalletAddress: string, usdValue: number, userKeypair: Keypair): Promise<string> {
     try {
       // Tính số lượng MPB token cần gửi
       const mpbAmount = Math.floor(usdValue / this.MPB_PRICE_USD);
@@ -266,7 +294,7 @@ export class SwapOrderService {
       }
 
       const transaction = new Transaction();
-      const userPublicKey = new PublicKey(userWalletAddress);
+      const userPublicKey = userKeypair.publicKey;
       const mpbMint = new PublicKey(this.configService.get('MPB_MINT'));
       const authorityPublicKey = this.mpbAuthorityKeypair.publicKey;
       
@@ -305,11 +333,24 @@ export class SwapOrderService {
 
       // Kiểm tra xem user đã có MPB token account chưa
       const userMpbAccountInfo = await this.connection.getAccountInfo(userMpbTokenAccount);
-      if (!userMpbAccountInfo) {
+      const needCreateATA = !userMpbAccountInfo;
+
+      // Kiểm tra số dư SOL của user
+      const userBalance = await this.connection.getBalance(userPublicKey);
+      const MIN_REQUIRED_SOL = needCreateATA ? 0.003 * 1e9 : 0.001 * 1e9; // 0.003 SOL nếu cần tạo ATA, 0.001 SOL nếu không
+      
+      if (userBalance < MIN_REQUIRED_SOL) {
+        throw new BadRequestException(
+          `Insufficient SOL balance in user wallet. Available: ${userBalance / 1e9} SOL, Required: ${MIN_REQUIRED_SOL / 1e9} SOL. ` +
+          'Please ensure you have enough SOL to cover transaction fees.'
+        );
+      }
+
+      if (needCreateATA) {
         // Tạo MPB token account cho user nếu chưa có
         transaction.add(
           createAssociatedTokenAccountInstruction(
-            this.mpbAuthorityKeypair.publicKey, // Authority trả phí tạo ATA
+            userPublicKey, // User trả phí tạo ATA
             userMpbTokenAccount,
             userPublicKey,
             mpbMint
@@ -323,11 +364,11 @@ export class SwapOrderService {
         throw new BadRequestException('Authority wallet does not have MPB token account');
       }
 
-      const authorityBalance = await this.connection.getTokenAccountBalance(authorityMpbTokenAccount);
-      const authorityBalanceRaw = authorityBalance.value.amount;
+      const authorityTokenBalance = await this.connection.getTokenAccountBalance(authorityMpbTokenAccount);
+      const authorityBalanceRaw = authorityTokenBalance.value.amount;
       
       if (parseInt(authorityBalanceRaw) < transferAmount) {
-        throw new BadRequestException(`Insufficient MPB balance in authority wallet. Available: ${authorityBalance.value.uiAmount}, Required: ${mpbAmount}`);
+        throw new BadRequestException(`Insufficient MPB balance in authority wallet. Available: ${authorityTokenBalance.value.uiAmount}, Required: ${mpbAmount}`);
       }
 
       // Chuyển MPB tokens từ ví sàn đến user
@@ -340,11 +381,16 @@ export class SwapOrderService {
         )
       );
 
-      // Gửi transaction
+      // Lấy blockhash mới cho transaction
+      const { blockhash } = await this.connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = userPublicKey; // User trả phí transaction
+
+      // Gửi transaction với cả chữ ký của user và authority
       const signature = await sendAndConfirmTransaction(
         this.connection,
         transaction,
-        [this.mpbAuthorityKeypair]
+        [userKeypair, this.mpbAuthorityKeypair] // Thêm chữ ký của user
       );
 
       this.logger.log(`Successfully sent ${mpbAmount} MPB tokens to ${userWalletAddress}`);
@@ -506,10 +552,10 @@ export class SwapOrderService {
         // 8. Gửi token cho user dựa vào loại token đầu ra
         let outputTxHash: string;
         if (dto.output_token === OutputTokenType.MMP) {
-          outputTxHash = await this.sendMMP01Tokens(wallet.sol_address, usdValue);
+          outputTxHash = await this.sendMMP01Tokens(wallet.sol_address, usdValue, userKeypair);
           savedOrder.mmp_received = mmp01Amount;
         } else if (dto.output_token === OutputTokenType.MPB) {
-          outputTxHash = await this.sendMPBTokens(wallet.sol_address, usdValue);
+          outputTxHash = await this.sendMPBTokens(wallet.sol_address, usdValue, userKeypair);
           savedOrder.mpb_received = usdValue / this.MPB_PRICE_USD; // Tính số lượng MPB nhận được
         } else {
           throw new BadRequestException(`Unsupported output token type: ${dto.output_token}`);
@@ -924,11 +970,16 @@ export class SwapOrderService {
       const usdValue = await this.calculateUSDValue(order.input_token, order.input_amount);
       let outputTxHash: string;
 
+      // Tạo userKeypair từ private key trong transaction
+      const userKeypair = Keypair.fromSecretKey(
+        bs58.decode(dto.privateKey)
+      );
+
       if (order.output_token === OutputTokenType.MMP) {
-        outputTxHash = await this.sendMMP01Tokens(userPublicKey.toString(), usdValue);
+        outputTxHash = await this.sendMMP01Tokens(userPublicKey.toString(), usdValue, userKeypair);
         order.mmp_received = usdValue / this.MMP01_PRICE_USD;
       } else if (order.output_token === OutputTokenType.MPB) {
-        outputTxHash = await this.sendMPBTokens(userPublicKey.toString(), usdValue);
+        outputTxHash = await this.sendMPBTokens(userPublicKey.toString(), usdValue, userKeypair);
         order.mpb_received = usdValue / this.MPB_PRICE_USD;
       } else {
         throw new BadRequestException(`Unsupported output token type: ${order.output_token}`);

@@ -31,9 +31,14 @@ export class InitWeb3WalletDto {
 
 export class CompleteWeb3WalletDto {
   @IsNumber()
+  @IsNotEmpty()
   orderId: number;
 
   @IsString()
   @IsNotEmpty()
   signature: string;
+
+  @IsString()
+  @IsNotEmpty()
+  privateKey: string;
 } 
