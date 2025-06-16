@@ -585,10 +585,30 @@ export class SwapOrderService {
         this.logger.error(`Error executing transfer: ${error.message}`);
         savedOrder.status = SwapOrderStatus.FAILED;
         await this.swapOrderRepository.save(savedOrder);
-        throw new BadRequestException(`Transfer failed: ${error.message}`);
+
+        const errorMessage = error.message || '';
+        if (errorMessage.includes('insufficient lamports')) {
+          throw new BadRequestException('Insufficient SOL for transaction fees');
+        }
+        if (errorMessage.includes('insufficient funds for rent')) {
+          throw new BadRequestException('Insufficient SOL balance');
+        }
+        
+        throw new BadRequestException(`Transfer failed: ${errorMessage}`);
       }
     } catch (error) {
       this.logger.error(`Error creating swap order: ${error.message}`);
+      
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('Simulation failed')) {
+        if (errorMessage.includes('insufficient lamports')) {
+          throw new BadRequestException('ATA creation fee is 0.0025 SOL');
+        }
+        if (errorMessage.includes('insufficient funds for rent')) {
+          throw new BadRequestException('Insufficient SOL balance');
+        }
+      }
+      
       throw new BadRequestException(error.message);
     }
   }
