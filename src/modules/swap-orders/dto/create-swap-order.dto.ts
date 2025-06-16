@@ -38,7 +38,4 @@ export class CompleteWeb3WalletDto {
   @IsNotEmpty()
   signature: string;
 
-  @IsString()
-  @IsNotEmpty()
-  privateKey: string;
 } 
