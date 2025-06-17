@@ -16,6 +16,7 @@ import { StakingPlanModule } from './modules/staking-plans/staking-plan.module';
 import { UserStakeModule } from './modules/user-stakes/user-stake.module';
 import { DepositWithdrawModule } from './modules/deposit-withdraws/deposit-withdraw.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { WebsocketModule } from './modules/websocket/websocket.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AdminModule } from './modules/admin/admin.module';
     UserStakeModule,
     DepositWithdrawModule,
     AdminModule,
+    WebsocketModule,
   ],
   controllers: [AppController], // Các controller của ứng dụng
   providers: [AppService]
