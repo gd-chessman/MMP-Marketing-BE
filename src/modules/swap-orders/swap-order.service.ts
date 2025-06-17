@@ -102,7 +102,7 @@ export class SwapOrderService {
     }
 
     try {
-      this.logger.debug('Fetching SOL price from Jupiter API...');
+      // this.logger.debug('Fetching SOL price from Jupiter API...');
       const response = await axios.get('https://api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112');
       const price = parseFloat(response.data.data['So11111111111111111111111111111111111111112'].price);
       
@@ -112,7 +112,7 @@ export class SwapOrderService {
         timestamp: Date.now()
       };
       
-      this.logger.debug(`Updated SOL price cache: $${price}`);
+      // this.logger.debug(`Updated SOL price cache: $${price}`);
       return price;
     } catch (error) {
       this.logger.error(`Error fetching SOL price: ${error.message}`);
@@ -178,7 +178,7 @@ export class SwapOrderService {
       // Chuyển đổi số lượng token thành số nguyên dựa trên decimals
       const transferAmount = Math.floor(mmp01Amount * Math.pow(10, decimals));
       
-      this.logger.log(`Calculated transfer: ${mmp01Amount} MMP01 tokens = ${transferAmount} raw units (decimals: ${decimals})`);
+      // this.logger.log(`Calculated transfer: ${mmp01Amount} MMP01 tokens = ${transferAmount} raw units (decimals: ${decimals})`);
       
       // Lấy MMP01 token account cho user
       const userMmp01TokenAccount = await getAssociatedTokenAddress(
@@ -192,11 +192,11 @@ export class SwapOrderService {
       const maxRetries = 10; // Tăng số lần retry
       const retryDelay = 3000; // 3 second
 
-      this.logger.debug(`Starting to check MMP01 token account for user: ${userWalletAddress}`);
-      this.logger.debug(`Token account address: ${userMmp01TokenAccount.toString()}`);
+      // this.logger.debug(`Starting to check MMP01 token account for user: ${userWalletAddress}`);
+      // this.logger.debug(`Token account address: ${userMmp01TokenAccount.toString()}`);
 
       while (retryCount < maxRetries) {
-        this.logger.debug(`Attempt ${retryCount + 1}/${maxRetries} to check MMP01 token account...`);
+        // this.logger.debug(`Attempt ${retryCount + 1}/${maxRetries} to check MMP01 token account...`);
         
         userMmp01AccountInfo = await this.connection.getAccountInfo(
           userMmp01TokenAccount,
@@ -204,8 +204,8 @@ export class SwapOrderService {
         );
         
         if (userMmp01AccountInfo) {
-          this.logger.debug(`MMP01 token account found after ${retryCount} retries`);
-          this.logger.debug(`Account data size: ${userMmp01AccountInfo.data.length} bytes`);
+          // this.logger.debug(`MMP01 token account found after ${retryCount} retries`);
+          // this.logger.debug(`Account data size: ${userMmp01AccountInfo.data.length} bytes`);
           break;
         }
         
@@ -264,7 +264,7 @@ export class SwapOrderService {
         }
       );
 
-      this.logger.log(`Transferred ${mmp01Amount} MMP01 tokens (${transferAmount} raw units) from authority to user ${userWalletAddress}`);
+      // this.logger.log(`Transferred ${mmp01Amount} MMP01 tokens (${transferAmount} raw units) from authority to user ${userWalletAddress}`);
       return txHash;
     } catch (error) {
       this.logger.error(`Error sending MMP01 tokens: ${error.message}`);
@@ -308,7 +308,7 @@ export class SwapOrderService {
       // Chuyển đổi số lượng token thành số nguyên dựa trên decimals
       const transferAmount = Math.floor(mpbAmount * Math.pow(10, decimals));
       
-      this.logger.log(`Calculated transfer: ${mpbAmount} MPB tokens = ${transferAmount} raw units (decimals: ${decimals})`);
+      // this.logger.log(`Calculated transfer: ${mpbAmount} MPB tokens = ${transferAmount} raw units (decimals: ${decimals})`);
       
       // Lấy MPB token account cho user
       const userMpbTokenAccount = await getAssociatedTokenAddress(
@@ -322,11 +322,11 @@ export class SwapOrderService {
       const maxRetries = 10; // Tăng số lần retry
       const retryDelay = 3000; // 3 second
 
-      this.logger.debug(`Starting to check MPB token account for user: ${userWalletAddress}`);
-      this.logger.debug(`Token account address: ${userMpbTokenAccount.toString()}`);
+      // this.logger.debug(`Starting to check MPB token account for user: ${userWalletAddress}`);
+      // this.logger.debug(`Token account address: ${userMpbTokenAccount.toString()}`);
 
       while (retryCount < maxRetries) {
-        this.logger.debug(`Attempt ${retryCount + 1}/${maxRetries} to check MPB token account...`);
+        // this.logger.debug(`Attempt ${retryCount + 1}/${maxRetries} to check MPB token account...`);
         
         userMpbAccountInfo = await this.connection.getAccountInfo(
           userMpbTokenAccount,
@@ -334,8 +334,8 @@ export class SwapOrderService {
         );
         
         if (userMpbAccountInfo) {
-          this.logger.debug(`MPB token account found after ${retryCount} retries`);
-          this.logger.debug(`Account data size: ${userMpbAccountInfo.data.length} bytes`);
+          // this.logger.debug(`MPB token account found after ${retryCount} retries`);
+          // this.logger.debug(`Account data size: ${userMpbAccountInfo.data.length} bytes`);
           break;
         }
         
@@ -508,6 +508,10 @@ export class SwapOrderService {
               preflightCommitment: 'confirmed'
             }
           );
+
+          // Delay 4 giây sau khi tạo ATA
+          await new Promise(resolve => setTimeout(resolve, 4000));
+          // this.logger.debug('Delayed 4 seconds after creating MMP ATA');
         }
       } else if (dto.output_token === OutputTokenType.MPB) {
         const mpbMint = new PublicKey(this.configService.get('MPB_MINT'));
@@ -542,6 +546,10 @@ export class SwapOrderService {
               preflightCommitment: 'confirmed'
             }
           );
+
+          // Delay 4 giây sau khi tạo ATA
+          await new Promise(resolve => setTimeout(resolve, 4000));
+          // this.logger.debug('Delayed 4 seconds after creating MPB ATA');
         }
       }
 
