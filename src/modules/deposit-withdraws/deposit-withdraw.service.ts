@@ -1,4 +1,3 @@
-
 import { Injectable, Logger, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -72,12 +71,16 @@ export class DepositWithdrawService {
       await this.depositWithdrawRepository.save(transaction);
 
       if (dto.type === TransactionType.WITHDRAW) {
-        if (dto.symbol === 'SOL') {
-          await this.processWithdrawal(transaction, fromKeypair);
-        } else if (dto.symbol === 'MMP' || dto.symbol === 'MPB') {
-          await this.processWithdrawalSPL(transaction, fromKeypair, dto.symbol);
-        } else {
-          throw new BadRequestException('Unsupported token symbol');
+        switch (dto.symbol) {
+          case 'SOL':
+            await this.processWithdrawal(transaction, fromKeypair);
+            break;
+          case 'MMP':
+          case 'MPB':
+            await this.processWithdrawalSPL(transaction, fromKeypair, dto.symbol);
+            break;
+          default:
+            throw new BadRequestException('Unsupported token symbol');
         }
       }
 
@@ -129,12 +132,15 @@ export class DepositWithdrawService {
     try {
       // Lấy mint address từ thuộc tính class
       let mintAddress: string | undefined;
-      if (symbol === 'MMP') {
-        mintAddress = this.MMP_MINT;
-      } else if (symbol === 'MPB') {
-        mintAddress = this.MPB_MINT;
-      } else {
-        throw new BadRequestException('Unsupported token symbol');
+      switch (symbol) {
+        case 'MMP':
+          mintAddress = this.MMP_MINT;
+          break;
+        case 'MPB':
+          mintAddress = this.MPB_MINT;
+          break;
+        default:
+          throw new BadRequestException('Unsupported token symbol');
       }
       if (!mintAddress) {
         throw new BadRequestException('Token mint address not configured');
