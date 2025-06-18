@@ -8,15 +8,15 @@ export class DepositWithdrawController {
   constructor(private readonly depositWithdrawService: DepositWithdrawService) {}
 
   @UseGuards(JwtGuestGuard)
-  @Get()
-  async getMyDepositWithdraws(@Req() req) {
-    return this.depositWithdrawService.findByWalletId(req.user.wallet.id);
-  }
-
-  @UseGuards(JwtGuestGuard)
   @Post()
   async create(@Body() dto: CreateDepositWithdrawDto, @Req() req) {
     return this.depositWithdrawService.createDepositWithdraw(dto, req.user.wallet);
+  }
+
+  @UseGuards(JwtGuestGuard)
+  @Get()
+  async getHistory(@Req() req) {
+    return this.depositWithdrawService.findByWalletAddress(req.user.wallet.sol_address);
   }
 
   // Các route sẽ được thêm sau

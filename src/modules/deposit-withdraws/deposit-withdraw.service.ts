@@ -219,9 +219,12 @@ export class DepositWithdrawService {
     }
   }
 
-  async findByWalletId(walletId: number): Promise<DepositWithdraw[]> {
+  async findByWalletAddress(wallet_address: string): Promise<DepositWithdraw[]> {
     return this.depositWithdrawRepository.find({
-      where: { wallet_id: walletId },
+      where: [
+        { from_address: wallet_address, status: WithdrawalStatus.COMPLETED },
+        { to_address: wallet_address, status: WithdrawalStatus.COMPLETED }
+      ],
       order: { created_at: 'DESC' }
     });
   }
