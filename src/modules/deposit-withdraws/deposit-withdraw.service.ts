@@ -56,7 +56,7 @@ export class DepositWithdrawService {
           throw new BadRequestException('Sender and receiver wallet addresses must be different');
         }
       } catch (error) {
-        this.logger.error(`Error creating deposit/withdraw: ${error.message}`);
+        this.logger.error(`Error creating deposit/withdraw 1: ${error.message}`);
         throw new BadRequestException('Invalid Solana wallet address');
       }
 
@@ -90,17 +90,8 @@ export class DepositWithdrawService {
 
       return transaction;
     } catch (error) {
-      this.logger.error(`Error creating deposit/withdraw: ${error.message}`);
-      const errorMessage = error.message || '';
-      if (errorMessage.includes('Simulation failed')) {
-        if (errorMessage.includes('insufficient lamports')) {
-          throw new BadRequestException('ATA creation fee is 0.0025 SOL');
-        }
-        if (errorMessage.includes('insufficient funds for rent')) {
-          throw new BadRequestException('Insufficient SOL balance');
-        }
-      }
-      throw new BadRequestException(`${errorMessage}`);
+      this.logger.error(`Error creating deposit/withdraw 2: ${error.message}`);
+      throw new BadRequestException(`${error.message}`);
     }
   }
 
@@ -113,7 +104,7 @@ export class DepositWithdrawService {
       if (balanceInSol < requiredAmount) {
         const adjustedAmount = balanceInSol - this.TRANSACTION_FEE;
         if (adjustedAmount <= 0) {
-          throw new BadRequestException('Insufficient wallet balance for transaction fee');
+          throw new BadRequestException('Insufficient SOL balance');
         }
         transaction.amount = adjustedAmount;
       }
@@ -137,7 +128,7 @@ export class DepositWithdrawService {
       transaction.status = WithdrawalStatus.FAILED;
       transaction.tx_hash = null;
       await this.depositWithdrawRepository.save(transaction);
-      throw new BadRequestException(`Transfer failed: ${error.message}`);
+      throw new BadRequestException(`${error.message}`);
     }
   }
 
@@ -218,7 +209,7 @@ export class DepositWithdrawService {
           throw new BadRequestException('ATA creation fee is 0.0025 SOL');
         }
         if (errorMessage.includes('insufficient funds for rent')) {
-          throw new BadRequestException('Insufficient SOL balance');
+          throw new BadRequestException('ATA creation fee is 0.0025 SOL');
         }
         if (errorMessage.includes('Attempt to debit an account but found no record of a prior credit')) {
           throw new BadRequestException('Insufficient SOL balance');
