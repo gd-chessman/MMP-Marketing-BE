@@ -16,6 +16,8 @@ export class DepositWithdrawService {
   private readonly TRANSACTION_FEE = 0.000005; // Transaction fee in SOL
   private readonly MMP_MINT: string;
   private readonly MPB_MINT: string;
+  private readonly USDT_MINT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB';
+  private readonly USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
   constructor(
     @InjectRepository(DepositWithdraw)
@@ -77,6 +79,8 @@ export class DepositWithdrawService {
             break;
           case 'MMP':
           case 'MPB':
+          case 'USDT':
+          case 'USDC':
             await this.processWithdrawalSPL(transaction, fromKeypair, dto.symbol);
             break;
           default:
@@ -138,6 +142,12 @@ export class DepositWithdrawService {
           break;
         case 'MPB':
           mintAddress = this.MPB_MINT;
+          break;
+        case 'USDT':
+          mintAddress = this.USDT_MINT;
+          break;
+        case 'USDC':
+          mintAddress = this.USDC_MINT;
           break;
         default:
           throw new BadRequestException('Unsupported token symbol');
@@ -202,7 +212,7 @@ export class DepositWithdrawService {
           throw new BadRequestException('Insufficient SOL balance');
         }
       }
-      throw new BadRequestException(`Transfer failed: ${errorMessage}`);
+      throw new BadRequestException(`${errorMessage}`);
     }
   }
 
