@@ -8,10 +8,8 @@ export enum TransactionType {
 
 export enum WithdrawalStatus {
   PENDING = 'pending',
-  PROCESSING = 'processing',
   COMPLETED = 'completed',
   FAILED = 'failed',
-  CANCELLED = 'cancelled'
 }
 
 @Entity('deposit_withdraws')
