@@ -91,7 +91,16 @@ export class DepositWithdrawService {
       return transaction;
     } catch (error) {
       this.logger.error(`Error creating deposit/withdraw: ${error.message}`);
-      throw error;
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('Simulation failed')) {
+        if (errorMessage.includes('insufficient lamports')) {
+          throw new BadRequestException('ATA creation fee is 0.0025 SOL');
+        }
+        if (errorMessage.includes('insufficient funds for rent')) {
+          throw new BadRequestException('Insufficient SOL balance');
+        }
+      }
+      throw new BadRequestException(`${errorMessage}`);
     }
   }
 
@@ -209,6 +218,9 @@ export class DepositWithdrawService {
           throw new BadRequestException('ATA creation fee is 0.0025 SOL');
         }
         if (errorMessage.includes('insufficient funds for rent')) {
+          throw new BadRequestException('Insufficient SOL balance');
+        }
+        if (errorMessage.includes('Attempt to debit an account but found no record of a prior credit')) {
           throw new BadRequestException('Insufficient SOL balance');
         }
       }
