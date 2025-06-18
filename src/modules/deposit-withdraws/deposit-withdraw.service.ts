@@ -1,3 +1,4 @@
+
 import { Injectable, Logger, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -71,16 +72,12 @@ export class DepositWithdrawService {
       await this.depositWithdrawRepository.save(transaction);
 
       if (dto.type === TransactionType.WITHDRAW) {
-        switch (dto.symbol) {
-          case 'SOL':
-            await this.processWithdrawal(transaction, fromKeypair);
-            break;
-          case 'MMP':
-          case 'MPB':
-            await this.processWithdrawalSPL(transaction, fromKeypair, dto.symbol);
-            break;
-          default:
-            throw new BadRequestException('Unsupported token symbol');
+        if (dto.symbol === 'SOL') {
+          await this.processWithdrawal(transaction, fromKeypair);
+        } else if (dto.symbol === 'MMP' || dto.symbol === 'MPB') {
+          await this.processWithdrawalSPL(transaction, fromKeypair, dto.symbol);
+        } else {
+          throw new BadRequestException('Unsupported token symbol');
         }
       }
 
@@ -93,33 +90,12 @@ export class DepositWithdrawService {
 
   private async processWithdrawal(transaction: DepositWithdraw, fromKeypair: Keypair) {
     try {
-      let balance: number;
-      let decimals: number | undefined;
-
-      switch (transaction.symbol) {
-        case 'SOL':
-          const solBalance = await this.connection.getBalance(fromKeypair.publicKey);
-          balance = solBalance / LAMPORTS_PER_SOL;
-          break;
-        case 'MMP':
-        case 'MPB':
-          const mintAddress = transaction.symbol === 'MMP' ? this.MMP_MINT : this.MPB_MINT;
-          if (!mintAddress) {
-            throw new BadRequestException('Token mint address not configured');
-          }
-          const mint = new PublicKey(mintAddress);
-          const fromTokenAccount = await getAssociatedTokenAddress(mint, fromKeypair.publicKey);
-          const fromTokenAccountInfo = await this.connection.getTokenAccountBalance(fromTokenAccount);
-          decimals = fromTokenAccountInfo.value.decimals;
-          balance = Number(fromTokenAccountInfo.value.uiAmount);
-          break;
-        default:
-          throw new BadRequestException('Unsupported token symbol');
-      }
-
+      // Kiểm tra số dư ví
+      const balance = await this.connection.getBalance(fromKeypair.publicKey);
+      const balanceInSol = balance / LAMPORTS_PER_SOL;
       const requiredAmount = Number(transaction.amount) + this.TRANSACTION_FEE;
-      if (balance < requiredAmount) {
-        const adjustedAmount = balance - this.TRANSACTION_FEE;
+      if (balanceInSol < requiredAmount) {
+        const adjustedAmount = balanceInSol - this.TRANSACTION_FEE;
         if (adjustedAmount <= 0) {
           throw new BadRequestException('Insufficient wallet balance for transaction fee');
         }
