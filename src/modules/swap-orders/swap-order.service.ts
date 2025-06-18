@@ -644,7 +644,6 @@ export class SwapOrderService {
 
         return savedOrder;
       } catch (error) {
-        this.logger.error(`Error executing transfer: ${error.message}`);
         savedOrder.status = SwapOrderStatus.FAILED;
         await this.swapOrderRepository.save(savedOrder);
 
