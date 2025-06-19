@@ -75,7 +75,7 @@ export class DepositWithdrawService {
       if (dto.type === TransactionType.WITHDRAW) {
         switch (dto.symbol) {
           case 'SOL':
-            await this.processWithdrawal(transaction, fromKeypair);
+            await this.processWithdrawalSOL(transaction, fromKeypair);
             break;
           case 'MMP':
           case 'MPB':
@@ -95,7 +95,7 @@ export class DepositWithdrawService {
     }
   }
 
-  private async processWithdrawal(transaction: DepositWithdraw, fromKeypair: Keypair) {
+  private async processWithdrawalSOL(transaction: DepositWithdraw, fromKeypair: Keypair) {
     try {
       // Kiểm tra số dư ví
       const balance = await this.connection.getBalance(fromKeypair.publicKey);
