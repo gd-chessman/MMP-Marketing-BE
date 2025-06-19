@@ -39,6 +39,7 @@ export class SwapOrderService {
     @InjectRepository(SwapOrder)
     private swapOrderRepository: Repository<SwapOrder>,
     @InjectRepository(Wallet)
+    private walletRepository: Repository<Wallet>,
     private configService: ConfigService,
     private referralRewardService: ReferralRewardService,
   ) {
