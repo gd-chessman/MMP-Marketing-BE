@@ -5,7 +5,7 @@ import { ReferralReward, RewardStatus } from './referral-reward.entity';
 import { Wallet } from '../wallets/wallet.entity';
 import { SwapOrder } from '../swap-orders/swap-order.entity';
 import { ConfigService } from '@nestjs/config';
-import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createTransferInstruction, getMint, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import bs58 from 'bs58';
 import { WalletType } from '../wallets/wallet.entity';
@@ -82,24 +82,52 @@ export class ReferralRewardService {
       }
 
       // Chọn loại token thưởng (có thể dựa vào output_token của swap hoặc config)
-      const rewardToken = this.getRewardToken(swapOrder);
 
-      // Tạo referral reward
-      const referralReward = this.referralRewardRepository.create({
+      // Tạo referral reward cho token
+      const tokenReferralReward = this.referralRewardRepository.create({
         referrer_wallet_id: referrerWallet.id,
         referred_wallet_id: referredWallet.id,
         swap_order_id: swapOrder.id,
         reward_amount: rewardAmount,
-        reward_token: rewardToken,
+        reward_token: swapOrder.output_token,
         status: RewardStatus.PENDING
       });
 
-      const savedReward = await this.referralRewardRepository.save(referralReward);
+      const savedTokenReward = await this.referralRewardRepository.save(tokenReferralReward);
 
-      // Tự động thanh toán referral reward
-      await this.payReferralReward(savedReward.id);
+      // Tạo referral reward cho SOL/USDT/USDC dựa vào input_token
+      let savedSolReward = null;
+      switch (swapOrder.input_token) {
+        case 'SOL':
+          const solRewardAmount = swapOrder.input_amount * rewardRate;
+          
+          const solReferralReward = this.referralRewardRepository.create({
+            referrer_wallet_id: referrerWallet.id,
+            referred_wallet_id: referredWallet.id,
+            swap_order_id: swapOrder.id,
+            reward_amount: solRewardAmount,
+            reward_token: swapOrder.input_token,
+            status: RewardStatus.PENDING
+          });
 
-      return savedReward;
+          savedSolReward = await this.referralRewardRepository.save(solReferralReward);
+          break;
+        case 'USDT':
+        case 'USDC':
+          // Xử lý USDT/USDC sau
+          break;
+        default:
+          // Không tạo reward cho các token khác
+          break;
+      }
+
+      // Tự động thanh toán referral rewards
+      await this.payReferralReward(savedTokenReward.id);
+      if (savedSolReward) {
+        await this.payReferralReward(savedSolReward.id);
+      }
+
+      return savedTokenReward;
 
     } catch (error) {
       console.error('Error creating referral reward:', error);
@@ -107,20 +135,8 @@ export class ReferralRewardService {
     }
   }
 
-  // Chọn loại token thưởng
-  private getRewardToken(swapOrder: SwapOrder): string {
-    // Có thể dựa vào output_token của swap hoặc config
-    // Ví dụ: nếu swap ra MMP thì thưởng MMP, nếu swap ra MPB thì thưởng MPB
-    switch (swapOrder.output_token) {
-      case 'MPB':
-        return 'MPB';
-      case 'MMP':
-      default:
-        return 'MMP';
-    }
-  }
 
-  // Thanh toán referral reward (gửi token MMP hoặc MPB)
+  // Thanh toán referral reward (gửi token MMP hoặc MPB hoặc SOL)
   async payReferralReward(rewardId: number): Promise<boolean> {
     try {
       const reward = await this.referralRewardRepository.findOne({
@@ -141,6 +157,9 @@ export class ReferralRewardService {
         case 'MPB':
           txHash = await this.sendMPBToReferrer(reward.referrer_wallet.sol_address, reward.reward_amount);
           break;
+        case 'SOL':
+          txHash = await this.sendSOLToReferrer(reward.referrer_wallet.sol_address, reward.reward_amount);
+          break;
         default:
           throw new Error(`Unsupported reward token: ${reward.reward_token}`);
       }
@@ -153,6 +172,7 @@ export class ReferralRewardService {
       return true;
 
     } catch (error) {
+      console.error('Error paying referral reward:', error);
       // Cập nhật trạng thái thành FAILED nếu có lỗi
       try {
         const reward = await this.referralRewardRepository.findOne({
@@ -251,6 +271,36 @@ export class ReferralRewardService {
     return signature;
   }
 
+  // Gửi SOL cho người giới thiệu
+  private async sendSOLToReferrer(toAddress: string, amount: number): Promise<string> {
+    const toPublicKey = new PublicKey(toAddress);
+    const authorityPublicKey = this.mmpAuthorityKeypair.publicKey;
+    
+    // Chuyển đổi SOL sang lamports (1 SOL = 10^9 lamports)
+    const lamports = Math.floor(amount * 1e9);
+    
+    const instructions = [
+      SystemProgram.transfer({
+        fromPubkey: authorityPublicKey,
+        toPubkey: toPublicKey,
+        lamports: lamports
+      })
+    ];
+
+    const tx = new Transaction().add(...instructions);
+    tx.feePayer = authorityPublicKey;
+    const { blockhash } = await this.connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+
+    // Ký và gửi transaction
+    const signature = await this.connection.sendTransaction(tx, [this.mmpAuthorityKeypair], {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
+    // Đợi xác nhận
+    await this.connection.confirmTransaction(signature, 'confirmed');
+    return signature;
+  }
 
   async findByWalletId(walletId: number): Promise<ReferralReward[]> {
     return this.referralRewardRepository.find({
