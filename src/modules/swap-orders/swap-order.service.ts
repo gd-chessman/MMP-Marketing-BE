@@ -9,6 +9,7 @@ import { CreateSwapOrderDto, InitWeb3WalletDto, CompleteWeb3WalletDto } from './
 import { TOKEN_PROGRAM_ID, getMint, createMintToInstruction, createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import bs58 from 'bs58';
 import axios from 'axios';
+import { ReferralRewardService } from '../referral-rewards/referral-reward.service';
 
 @Injectable()
 export class SwapOrderService {
@@ -40,6 +41,7 @@ export class SwapOrderService {
     @InjectRepository(Wallet)
     private walletRepository: Repository<Wallet>,
     private configService: ConfigService,
+    private referralRewardService: ReferralRewardService,
   ) {
     this.connection = new Connection(this.configService.get('SOLANA_RPC_URL'));
     
@@ -642,6 +644,10 @@ export class SwapOrderService {
         savedOrder.tx_hash_ref = outputTxHash;
         await this.swapOrderRepository.save(savedOrder);
 
+        // 11. Tạo referral reward nếu có người giới thiệu (xử lý ngầm, không await)
+        this.referralRewardService.createReferralReward(savedOrder)
+          .catch(error => this.logger.error(`Failed to create referral reward: ${error.message}`));
+
         return savedOrder;
       } catch (error) {
         savedOrder.status = SwapOrderStatus.FAILED;
@@ -1079,6 +1085,10 @@ export class SwapOrderService {
       order.tx_hash_send = dto.signature;
       order.tx_hash_ref = outputTxHash;
       await this.swapOrderRepository.save(order);
+
+      // 9. Tạo referral reward nếu có người giới thiệu
+      this.referralRewardService.createReferralReward(order)
+        .catch(error => this.logger.error(`Failed to create referral reward: ${error.message}`));
 
       return order;
     } catch (error) {
