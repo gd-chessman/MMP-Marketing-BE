@@ -4,10 +4,14 @@ import { DepositWithdraw } from './deposit-withdraw.entity';
 import { DepositWithdrawService } from './deposit-withdraw.service';
 import { DepositWithdrawController } from './deposit-withdraw.controller';
 import { Wallet } from '../wallets/wallet.entity';
-
+import { SwapOrderModule } from '../swap-orders/swap-order.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DepositWithdraw]), Wallet],
+  imports: [
+    TypeOrmModule.forFeature([DepositWithdraw]), 
+    Wallet,
+    SwapOrderModule
+  ],
   providers: [DepositWithdrawService],
   controllers: [DepositWithdrawController],
   exports: [DepositWithdrawService],

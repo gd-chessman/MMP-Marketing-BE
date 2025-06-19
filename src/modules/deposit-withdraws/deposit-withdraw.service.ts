@@ -8,6 +8,7 @@ import { PublicKey, Connection, LAMPORTS_PER_SOL, SystemProgram, Transaction, se
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import bs58 from 'bs58';
 import { ConfigService } from '@nestjs/config';
+import { SwapOrderService } from '../swap-orders/swap-order.service';
 
 @Injectable()
 export class DepositWithdrawService {
@@ -18,14 +19,14 @@ export class DepositWithdrawService {
   private readonly MPB_MINT: string;
   private readonly USDT_MINT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB';
   private readonly USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-  private readonly WITHDRAWAL_FEE_USD = 0.5; // $1
-  private readonly SOL_PRICE_USD = 146.0; // $146
+  private readonly WITHDRAWAL_FEE_USD = 1.0; // $1
   private readonly DESTINATION_WALLET: string; // Ví sàn để nhận phí
 
   constructor(
     @InjectRepository(DepositWithdraw)
     private readonly depositWithdrawRepository: Repository<DepositWithdraw>,
     private readonly configService: ConfigService,
+    private readonly swapOrderService: SwapOrderService,
   ) {
     // Bạn cần truyền SOLANA_RPC_URL qua biến môi trường hoặc config
     const rpcUrl = this.configService.get<string>('SOLANA_RPC_URL');
@@ -227,7 +228,8 @@ export class DepositWithdrawService {
   private async processWithdrawalSOLWithFee(transaction: DepositWithdraw, fromKeypair: Keypair) {
     try {
       // Tính phí $1 chuyển về SOL
-      const feeInSol = this.WITHDRAWAL_FEE_USD / this.SOL_PRICE_USD; // $1 / $146 = 0.00685 SOL
+      const solPriceUSD = await this.swapOrderService.getSolPriceUSD();
+      const feeInSol = this.WITHDRAWAL_FEE_USD / solPriceUSD; // $1 / current SOL price
       
       // Kiểm tra số dư ví
       const balance = await this.connection.getBalance(fromKeypair.publicKey);
