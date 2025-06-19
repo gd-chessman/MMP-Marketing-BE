@@ -114,7 +114,21 @@ export class ReferralRewardService {
           break;
         case 'USDT':
         case 'USDC':
-          // Xử lý USDT/USDC sau
+          // Quy đổi USDT/USDC sang SOL với tỷ giá 1 SOL = $146
+          const usdValue = swapOrder.input_amount; // USDT/USDC có giá trị 1:1 với USD
+          const solEquivalent = usdValue / 146; // Chia cho 146 để quy đổi sang SOL
+          const usdtUsdcRewardAmount = solEquivalent * rewardRate;
+          
+          const usdtUsdcReferralReward = this.referralRewardRepository.create({
+            referrer_wallet_id: referrerWallet.id,
+            referred_wallet_id: referredWallet.id,
+            swap_order_id: swapOrder.id,
+            reward_amount: usdtUsdcRewardAmount,
+            reward_token: 'SOL', // Thưởng bằng SOL thay vì USDT/USDC
+            status: RewardStatus.PENDING
+          });
+
+          savedSolReward = await this.referralRewardRepository.save(usdtUsdcReferralReward);
           break;
         default:
           // Không tạo reward cho các token khác
