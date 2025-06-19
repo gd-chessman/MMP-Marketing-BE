@@ -39,7 +39,6 @@ export class SwapOrderService {
     @InjectRepository(SwapOrder)
     private swapOrderRepository: Repository<SwapOrder>,
     @InjectRepository(Wallet)
-    private walletRepository: Repository<Wallet>,
     private configService: ConfigService,
     private referralRewardService: ReferralRewardService,
   ) {
@@ -640,13 +639,13 @@ export class SwapOrderService {
 
         // 10. Cập nhật trạng thái order thành COMPLETED
         savedOrder.status = SwapOrderStatus.COMPLETED;
-        savedOrder.tx_hash_send = txHash;
+        savedOrder.tx_hash_send = txHash; this.referralRewardService.createReferralReward(savedOrder, this.solPriceCache.price)
+          .catch(error => this.logger.error(`Failed to create referral reward: ${error.message}`));
         savedOrder.tx_hash_ref = outputTxHash;
         await this.swapOrderRepository.save(savedOrder);
 
         // 11. Tạo referral reward nếu có người giới thiệu (xử lý ngầm, không await)
-        this.referralRewardService.createReferralReward(savedOrder)
-          .catch(error => this.logger.error(`Failed to create referral reward: ${error.message}`));
+       
 
         return savedOrder;
       } catch (error) {
@@ -1087,7 +1086,7 @@ export class SwapOrderService {
       await this.swapOrderRepository.save(order);
 
       // 9. Tạo referral reward nếu có người giới thiệu
-      this.referralRewardService.createReferralReward(order)
+      this.referralRewardService.createReferralReward(order, this.solPriceCache.price)
         .catch(error => this.logger.error(`Failed to create referral reward: ${error.message}`));
 
       return order;

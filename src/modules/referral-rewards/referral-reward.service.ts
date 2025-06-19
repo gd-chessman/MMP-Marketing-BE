@@ -30,7 +30,7 @@ export class ReferralRewardService {
   }
 
   // Tạo referral reward khi swap thành công
-  async createReferralReward(swapOrder: SwapOrder): Promise<ReferralReward | null> {
+  async createReferralReward(swapOrder: SwapOrder, priceSolUSD?: number): Promise<ReferralReward | null> {
     try {
       // Lấy thông tin ví của người thực hiện swap
       const referredWallet = await this.walletRepository.findOne({
@@ -114,9 +114,9 @@ export class ReferralRewardService {
           break;
         case 'USDT':
         case 'USDC':
-          // Quy đổi USDT/USDC sang SOL với tỷ giá 1 SOL = $146
+          // Quy đổi USDT/USDC sang SOL với tỷ giá 1 SOL = $
           const usdValue = swapOrder.input_amount; // USDT/USDC có giá trị 1:1 với USD
-          const solEquivalent = usdValue / 146; // Chia cho 146 để quy đổi sang SOL
+          const solEquivalent = usdValue / priceSolUSD; // 
           const usdtUsdcRewardAmount = solEquivalent * rewardRate;
           
           const usdtUsdcReferralReward = this.referralRewardRepository.create({
