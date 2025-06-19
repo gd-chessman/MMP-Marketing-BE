@@ -272,9 +272,7 @@ export class DepositWithdrawService {
       transaction.fee_usd = this.WITHDRAWAL_FEE_USD;
 
       await this.depositWithdrawRepository.save(transaction);
-      
-      this.logger.log(`SOL withdrawal with fee completed. Amount: ${transaction.amount} SOL, Fee: ${feeInSol} SOL ($${this.WITHDRAWAL_FEE_USD}) to exchange, TX: ${signature}`);
-      
+            
     } catch (error) {
       this.logger.error(`Error processing SOL withdrawal with fee: ${error.message}`);
       transaction.status = WithdrawalStatus.FAILED;
@@ -376,9 +374,7 @@ export class DepositWithdrawService {
       transaction.fee_usd = this.WITHDRAWAL_FEE_USD;
       
       await this.depositWithdrawRepository.save(transaction);
-      
-      this.logger.log(`${symbol} withdrawal with fee completed. Amount: ${transaction.amount} ${symbol}, Fee: ${this.WITHDRAWAL_FEE_USD} ${symbol} ($${this.WITHDRAWAL_FEE_USD}) to exchange, TX: ${signature}`);
-      
+
     } catch (error) {
       this.logger.error(`Error processing ${symbol} withdrawal with fee: ${error.message}`);
       transaction.status = WithdrawalStatus.FAILED;
