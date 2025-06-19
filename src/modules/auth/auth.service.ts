@@ -517,9 +517,11 @@ export class AuthService {
             });
 
             if (!wallet) {
-                // Nếu chưa có wallet, tạo mới
+                // Nếu chưa có wallet, tạo user mới và gán vào wallet
+                const newUser = this.userRepository.create({});
+                await this.userRepository.save(newUser);
                 wallet = this.walletRepository.create({
-                    user_id: null,
+                    user_id: newUser.id,
                     sol_address: solAddress,
                     private_key: null,
                 });
@@ -528,6 +530,7 @@ export class AuthService {
 
             // 3. Tạo JWT chỉ với wallet_id
             const payload = {
+                user_id: wallet.user_id,
                 wallet_id: wallet.id,
             };
             const accessToken = this.jwtService.sign(payload);
@@ -546,4 +549,31 @@ export class AuthService {
             throw new BadRequestException('Invalid signature format');
         }
     }
+
+    // async handleAddUser(): Promise<any> {
+    //     // 1. Lấy toàn bộ wallet
+    //     const allWallets = await this.walletRepository.find();
+    //     // 2. Lọc các wallet có user_id bị trống/null/0/undefined/NaN
+    //     const wallets = allWallets.filter(w => w.user_id === null || w.user_id === undefined || w.user_id === 0 || Number.isNaN(w.user_id));
+    //     if (!wallets.length) {
+    //         return { status: false, message: 'No wallets with empty user_id found.' };
+    //     }
+    //     // 3. Với mỗi wallet, tạo 1 user mới và gán user_id
+    //     const createdUsers = [];
+    //     const updatedWallets = [];
+    //     for (const wallet of wallets) {
+    //         const newUser = this.userRepository.create({});
+    //         await this.userRepository.save(newUser);
+    //         wallet.user_id = newUser.id;
+    //         await this.walletRepository.save(wallet);
+    //         createdUsers.push(newUser);
+    //         updatedWallets.push(wallet);
+    //     }
+    //     // 4. Trả về danh sách user mới và wallet đã cập nhật
+    //     return {
+    //         status: true,
+    //         users: createdUsers,
+    //         updatedWallets: updatedWallets
+    //     };
+    // }
 }
