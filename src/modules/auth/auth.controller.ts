@@ -10,11 +10,11 @@ export class AuthController {
 
     @Post('login-telegram')
     async loginWithTelegram(
-        @Body() body: { id: string; code: string },
+        @Body() body: { id: string; code: string , ref_code?: string},
         @Res({ passthrough: true }) res: Response,
     ) {
-        const { id, code } = body;
-        return this.authService.handleTelegramLogin(id, code, res);
+        const { id, code, ref_code } = body;
+        return this.authService.handleTelegramLogin(id, code, res, ref_code);
     }
 
     @Post('logout')

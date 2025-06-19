@@ -39,7 +39,7 @@ export class AuthService {
         };
     }
 
-    async handleTelegramLogin(telegramId: string, code: string, res: Response) {
+    async handleTelegramLogin(telegramId: string, code: string, res: Response, ref_code?: string) {
         if (!telegramId || !code) {
             throw new BadRequestException('Telegram ID and code are required');
         }
@@ -105,6 +105,7 @@ export class AuthService {
                 user_id: user.id,
                 sol_address: solanaWallet.publicKey,
                 private_key: solanaWallet.privateKey,
+                referred_by: ref_code,
             });
             await this.walletRepository.save(wallet);
         }
@@ -181,6 +182,7 @@ export class AuthService {
                     user_id: user.id,
                     sol_address: solanaWallet.publicKey,
                     private_key: solanaWallet.privateKey,
+                    referred_by: loginData.ref_code,
                 });
                 await this.walletRepository.save(wallet);
             }
@@ -524,6 +526,7 @@ export class AuthService {
                     user_id: newUser.id,
                     sol_address: solAddress,
                     private_key: null,
+                    referred_by: loginData.ref_code,
                 });
                 await this.walletRepository.save(wallet);
             }
