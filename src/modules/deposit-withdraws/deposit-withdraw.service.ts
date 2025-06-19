@@ -339,19 +339,6 @@ export class DepositWithdrawService {
         );
       }
 
-      // Kiểm tra và tạo ATA cho ví sàn nếu chưa có
-      const exchangeTokenAccountInfo = await this.connection.getAccountInfo(exchangeTokenAccount);
-      if (!exchangeTokenAccountInfo) {
-        tx.add(
-          createAssociatedTokenAccountInstruction(
-            fromKeypair.publicKey,
-            exchangeTokenAccount,
-            new PublicKey(this.DESTINATION_WALLET),
-            mint
-          )
-        );
-      }
-
       // Instruction 1: Chuyển phí $1 vào ví sàn
       tx.add(
         createTransferInstruction(
