@@ -39,7 +39,7 @@ export class AuthService {
         };
     }
 
-    async handleTelegramLogin(telegramId: string, code: string, res: Response, ref_code?: string) {
+    async handleTelegramLogin(telegramId: string, code: string, res: Response, ref_code?: any) {
         if (!telegramId || !code) {
             throw new BadRequestException('Telegram ID and code are required');
         }

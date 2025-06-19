@@ -251,4 +251,24 @@ export class ReferralRewardService {
     return signature;
   }
 
+
+  async findByWalletId(walletId: number): Promise<ReferralReward[]> {
+    return this.referralRewardRepository.find({
+      where: { referrer_wallet_id: walletId, status: RewardStatus.PAID },
+      relations: ['referred_wallet'],
+      select: {
+        id: true,
+        reward_amount: true,
+        reward_token: true,
+        status: true,
+        tx_hash: true,
+        created_at: true,
+        referred_wallet: {
+          sol_address: true
+        }
+      },
+      order: { created_at: 'DESC' }
+    });
+  }
+
 } 

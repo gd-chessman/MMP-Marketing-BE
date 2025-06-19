@@ -10,7 +10,7 @@ export class AuthController {
 
     @Post('login-telegram')
     async loginWithTelegram(
-        @Body() body: { id: string; code: string , ref_code?: string},
+        @Body() body: { id: string; code: string , ref_code?: any},
         @Res({ passthrough: true }) res: Response,
     ) {
         const { id, code, ref_code } = body;

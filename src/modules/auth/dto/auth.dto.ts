@@ -2,7 +2,7 @@ import { IsArray, IsNumber, IsString } from 'class-validator';
 
 export interface GoogleLoginDto {
     code: string;  // Authorization code from Google
-    ref_code?: string;
+    ref_code?: any;
 }
 
 export interface LoginResponse {
@@ -44,6 +44,5 @@ export class PhantomLoginDto {
     @IsString()
     message: string;
 
-    @IsString()
-    ref_code?: string;
+    ref_code?: any;
 }
