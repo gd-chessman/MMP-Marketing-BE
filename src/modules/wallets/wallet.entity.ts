@@ -14,7 +14,7 @@ export class Wallet {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', unique: true })
   sol_address: string;
 
   @Exclude()
