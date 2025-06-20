@@ -9,6 +9,7 @@ import { Connection, Keypair, PublicKey, Transaction, SystemProgram } from '@sol
 import { getAssociatedTokenAddress, createTransferInstruction, getMint, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import bs58 from 'bs58';
 import { WalletType } from '../wallets/wallet.entity';
+import { ReferralStatisticsDto } from './dto/referral-statistics.dto';
 
 @Injectable()
 export class ReferralRewardService {
@@ -316,8 +317,10 @@ export class ReferralRewardService {
     return signature;
   }
 
-  async findByWalletId(walletId: number): Promise<ReferralReward[]> {
-    return this.referralRewardRepository.find({
+  async findByWalletId(walletId: number, page: number = 1, limit: number = 50): Promise<{ data: ReferralReward[]; total: number; page: number; limit: number }> {
+    const skip = (page - 1) * limit;
+    
+    const [data, total] = await this.referralRewardRepository.findAndCount({
       where: { referrer_wallet_id: walletId, status: RewardStatus.PAID },
       relations: ['referred_wallet'],
       select: {
@@ -331,8 +334,77 @@ export class ReferralRewardService {
           sol_address: true
         }
       },
-      order: { created_at: 'DESC' }
+      order: { created_at: 'DESC' },
+      skip,
+      take: limit
     });
+
+    return {
+      data,
+      total,
+      page,
+      limit
+    };
+  }
+
+  // Lấy thống kê referral rewards của một wallet
+  async getReferralStatistics(walletId: number): Promise<ReferralStatisticsDto> {
+    // Lấy tổng số người đã giới thiệu (unique referred wallets)
+    const totalReferrals = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .select('COUNT(DISTINCT reward.referred_wallet_id)', 'count')
+      .getRawOne();
+
+    // Lấy tổng phần thưởng theo từng loại token (chỉ tính PAID)
+    const rewardStats = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status = :status', { status: RewardStatus.PAID })
+      .select([
+        'reward.reward_token as token',
+        'SUM(reward.reward_amount) as total_amount'
+      ])
+      .groupBy('reward.reward_token')
+      .getRawMany();
+
+    // Lấy ngày reward đầu tiên và cuối cùng
+    const dateStats = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status = :status', { status: RewardStatus.PAID })
+      .select([
+        'MIN(reward.created_at) as first_date',
+        'MAX(reward.created_at) as last_date'
+      ])
+      .getRawOne();
+
+    const statistics: ReferralStatisticsDto = {
+      total_referrals: parseInt(totalReferrals?.count || '0'),
+      total_reward_sol: 0,
+      total_reward_mmp: 0,
+      total_reward_mpb: 0,
+      first_reward_date: dateStats?.first_date ? new Date(dateStats.first_date) : undefined,
+      last_reward_date: dateStats?.last_date ? new Date(dateStats.last_date) : undefined
+    };
+
+    // Phân loại theo token type
+    rewardStats.forEach(stat => {
+      const amount = parseFloat(stat.total_amount);
+      switch (stat.token) {
+        case 'SOL':
+          statistics.total_reward_sol = amount;
+          break;
+        case 'MMP':
+          statistics.total_reward_mmp = amount;
+          break;
+        case 'MPB':
+          statistics.total_reward_mpb = amount;
+          break;
+      }
+    });
+
+    return statistics;
   }
 
 } 
