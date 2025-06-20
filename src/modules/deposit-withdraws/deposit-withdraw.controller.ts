@@ -15,8 +15,19 @@ export class DepositWithdrawController {
 
   @UseGuards(JwtGuestGuard)
   @Get()
-  async getHistory(@Req() req) {
-    return this.depositWithdrawService.findByWalletAddress(req.user.wallet.sol_address);
+  async getHistory(
+    @Req() req,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '50'
+  ) {
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit) || 50));
+    
+    return this.depositWithdrawService.findByWalletAddress(
+      req.user.wallet.sol_address,
+      pageNum,
+      limitNum
+    );
   }
 
   // Các route sẽ được thêm sau

@@ -384,13 +384,24 @@ export class DepositWithdrawService {
     }
   }
 
-  async findByWalletAddress(wallet_address: string): Promise<DepositWithdraw[]> {
-    return this.depositWithdrawRepository.find({
+  async findByWalletAddress(wallet_address: string, page: number = 1, limit: number = 50): Promise<{ data: DepositWithdraw[], total: number, page: number, limit: number }> {
+    const skip = (page - 1) * limit;
+    
+    const [data, total] = await this.depositWithdrawRepository.findAndCount({
       where: [
         { from_address: wallet_address, status: WithdrawalStatus.COMPLETED },
         { to_address: wallet_address, status: WithdrawalStatus.COMPLETED }
       ],
-      order: { created_at: 'DESC' }
+      order: { created_at: 'DESC' },
+      skip,
+      take: limit
     });
+
+    return {
+      data,
+      total,
+      page,
+      limit
+    };
   }
 } 
