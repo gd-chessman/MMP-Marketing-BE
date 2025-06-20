@@ -100,6 +100,15 @@ export class DepositWithdrawService {
       return transaction;
     } catch (error) {
       this.logger.error(`Error creating deposit/withdraw 2: ${error.message}`);
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('Simulation failed')) {
+        if (errorMessage.includes('insufficient lamports')) {
+          throw new BadRequestException('ATA creation fee is 0.0025 SOL');
+        }
+        if (errorMessage.includes('insufficient funds for rent')) {
+          throw new BadRequestException('Insufficient SOL balance');
+        }
+      }
       throw new BadRequestException(`${error.message}`);
     }
   }
