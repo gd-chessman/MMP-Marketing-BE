@@ -82,8 +82,6 @@ export class ReferralRewardService {
           break;
       }
 
-      // Chọn loại token thưởng (có thể dựa vào output_token của swap hoặc config)
-
       // Tạo referral reward cho token
       const tokenReferralReward = this.referralRewardRepository.create({
         referrer_wallet_id: referrerWallet.id,
@@ -137,9 +135,14 @@ export class ReferralRewardService {
       }
 
       // Tự động thanh toán referral rewards
-      await this.payReferralReward(savedTokenReward.id);
+      // SOL luôn được thanh toán ngay lập tức
       if (savedSolReward) {
         await this.payReferralReward(savedSolReward.id);
+      }
+
+      // Kiểm tra và thanh toán MMP/MPB nếu đạt ngưỡng 5,000
+      if (savedTokenReward.reward_token === 'MMP' || savedTokenReward.reward_token === 'MPB') {
+        await this.checkAndPayTokenReward(referrerWallet.id, savedTokenReward.reward_token);
       }
 
       return savedTokenReward;
@@ -150,6 +153,93 @@ export class ReferralRewardService {
     }
   }
 
+  // Kiểm tra và thanh toán thưởng MMP/MPB khi đạt ngưỡng 5,000
+  private async checkAndPayTokenReward(walletId: number, tokenType: string): Promise<void> {
+    try {
+      // Tính tổng thưởng tích lũy chưa thanh toán
+      const totalPendingReward = await this.referralRewardRepository
+        .createQueryBuilder('reward')
+        .where('reward.referrer_wallet_id = :walletId', { walletId })
+        .andWhere('reward.reward_token = :tokenType', { tokenType })
+        .andWhere('reward.status = :status', { status: RewardStatus.PENDING })
+        .select('SUM(reward.reward_amount)', 'total')
+        .getRawOne();
+
+      const totalAmount = parseFloat(totalPendingReward?.total || '0');
+      console.log('totalAmount', totalAmount);
+
+      // Nếu đạt ngưỡng 5,000, thanh toán tất cả thưởng tích lũy
+      if (totalAmount >= 5000) {
+        await this.payAllPendingRewards(walletId, tokenType);
+      }
+    } catch (error) {
+      console.error('Error checking token reward:', error);
+    }
+  }
+
+  // Thanh toán tất cả thưởng chưa thanh toán cho một loại token
+  private async payAllPendingRewards(walletId: number, tokenType: string): Promise<void> {
+    try {
+      // Lấy tất cả thưởng chưa thanh toán
+      const pendingRewards = await this.referralRewardRepository.find({
+        where: {
+          referrer_wallet_id: walletId,
+          reward_token: tokenType,
+          status: RewardStatus.PENDING
+        },
+        relations: ['referrer_wallet']
+      });
+
+      if (pendingRewards.length === 0) {
+        return;
+      }
+
+      // Tính tổng số lượng thưởng
+      const totalAmount = pendingRewards.reduce((sum, reward) => sum + parseFloat(reward.reward_amount.toString()), 0);
+
+      // Gửi token
+      let txHash: string;
+      switch (tokenType) {
+        case 'MMP':
+          txHash = await this.sendMMPToReferrer(pendingRewards[0].referrer_wallet.sol_address, totalAmount);
+          break;
+        case 'MPB':
+          txHash = await this.sendMPBToReferrer(pendingRewards[0].referrer_wallet.sol_address, totalAmount);
+          break;
+        default:
+          return;
+      }
+
+      // Cập nhật trạng thái tất cả thưởng đã thanh toán
+      for (const reward of pendingRewards) {
+        reward.status = RewardStatus.PAID;
+        reward.tx_hash = txHash;
+        await this.referralRewardRepository.save(reward);
+      }
+
+      console.log(`Paid ${totalAmount} ${tokenType} tokens to wallet ${walletId}`);
+
+    } catch (error) {
+      console.error('Error paying pending rewards:', error);
+      // Cập nhật trạng thái thành FAILED nếu có lỗi
+      try {
+        const pendingRewards = await this.referralRewardRepository.find({
+          where: {
+            referrer_wallet_id: walletId,
+            reward_token: tokenType,
+            status: RewardStatus.PENDING
+          }
+        });
+
+        for (const reward of pendingRewards) {
+          reward.status = RewardStatus.FAILED;
+          await this.referralRewardRepository.save(reward);
+        }
+      } catch (updateError) {
+        console.error('Failed to update reward status:', updateError);
+      }
+    }
+  }
 
   // Thanh toán referral reward (gửi token MMP hoặc MPB hoặc SOL)
   async payReferralReward(rewardId: number): Promise<boolean> {
