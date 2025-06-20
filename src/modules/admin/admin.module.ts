@@ -6,6 +6,7 @@ import { AdminController } from './admin.controller';
 import { AuthModule } from './auth/auth.module';
 import { UserAdminModule } from './user-admins/user-admin.module';
 import { WalletModule } from './wallets/wallet.module';
+import { TokenSaleRoundModule } from './token-sale-rounds/token-sale-round.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { WalletModule } from './wallets/wallet.module';
     AuthModule,
     UserAdminModule,
     WalletModule,
+    TokenSaleRoundModule,
   ],
   providers: [AdminService],
   controllers: [AdminController],
