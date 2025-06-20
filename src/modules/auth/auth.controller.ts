@@ -67,10 +67,4 @@ export class AuthController {
     async loginWithPhantom(@Body() body: PhantomLoginDto, @Res({ passthrough: true }) res: Response): Promise<LoginResponse> {
         return await this.authService.handlePhantomLogin(body, res);
     }
-
-    // @Post('add-user')
-    // @UseGuards(JwtGuestGuard)
-    // async addUser(): Promise<any> {
-    //     return await this.authService.handleAddUser();
-    // }
 }

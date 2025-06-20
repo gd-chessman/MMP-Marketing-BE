@@ -43,6 +43,4 @@ export class PhantomLoginDto {
 
     @IsString()
     message: string;
-
-    ref_code?: any;
 }
