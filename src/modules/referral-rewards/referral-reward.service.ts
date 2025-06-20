@@ -156,17 +156,17 @@ export class ReferralRewardService {
   // Kiểm tra và thanh toán thưởng MMP/MPB khi đạt ngưỡng 5,000
   private async checkAndPayTokenReward(walletId: number, tokenType: string): Promise<void> {
     try {
-      // Tính tổng thưởng tích lũy chưa thanh toán
-      const totalPendingReward = await this.referralRewardRepository
-        .createQueryBuilder('reward')
-        .where('reward.referrer_wallet_id = :walletId', { walletId })
-        .andWhere('reward.reward_token = :tokenType', { tokenType })
-        .andWhere('reward.status = :status', { status: RewardStatus.PENDING })
-        .select('SUM(reward.reward_amount)', 'total')
+      // Tính tổng mmp_received hoặc mpb_received từ swap_orders của người giới thiệu
+      const totalTokenReceived = await this.swapOrderRepository
+        .createQueryBuilder('swap')
+        .where('swap.wallet_id = :walletId', { walletId })
+        .andWhere('swap.output_token = :tokenType', { tokenType })
+        .andWhere('swap.status = :status', { status: 'completed' })
+        .select(`SUM(swap.${tokenType.toLowerCase()}_received)`, 'total')
         .getRawOne();
 
-      const totalAmount = parseFloat(totalPendingReward?.total || '0');
-      console.log('totalAmount', totalAmount);
+      const totalAmount = parseFloat(totalTokenReceived?.total || '0');
+      console.log(`Total ${tokenType} received by referrer:`, totalAmount);
 
       // Nếu đạt ngưỡng 5,000, thanh toán tất cả thưởng tích lũy
       if (totalAmount >= 5000) {
