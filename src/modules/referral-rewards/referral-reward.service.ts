@@ -66,13 +66,14 @@ export class ReferralRewardService {
         rewardRate = 0.10;
       }
 
-      // Tính toán phần thưởng (theo tỷ lệ rewardRate của số lượng token mà user nhận được)
+      // Tính toán phần thưởng MMP (theo tỷ lệ rewardRate của số lượng token mà user nhận được)
       let rewardAmount: number;
       switch (swapOrder.output_token) {
         case 'MMP':
           rewardAmount = swapOrder.mmp_received ? swapOrder.mmp_received * rewardRate : 0;
           break;
         case 'MPB':
+          // Nếu output là MPB, vẫn tính thưởng MMP dựa trên số lượng MPB nhận được
           rewardAmount = swapOrder.mpb_received ? swapOrder.mpb_received * rewardRate : 0;
           break;
         default:
@@ -82,17 +83,17 @@ export class ReferralRewardService {
           break;
       }
 
-      // Tạo referral reward cho token
-      const tokenReferralReward = this.referralRewardRepository.create({
+      // Tạo referral reward cho MMP (luôn là MMP bất kể output token là gì)
+      const mmpReferralReward = this.referralRewardRepository.create({
         referrer_wallet_id: referrerWallet.id,
         referred_wallet_id: referredWallet.id,
         swap_order_id: swapOrder.id,
         reward_amount: rewardAmount,
-        reward_token: swapOrder.output_token,
+        reward_token: 'MMP', // Luôn là MMP
         status: RewardStatus.PENDING
       });
 
-      const savedTokenReward = await this.referralRewardRepository.save(tokenReferralReward);
+      const savedMmpReward = await this.referralRewardRepository.save(mmpReferralReward);
 
       // Tạo referral reward cho SOL/USDT/USDC dựa vào input_token
       let savedSolReward = null;
@@ -140,12 +141,10 @@ export class ReferralRewardService {
         await this.payReferralReward(savedSolReward.id);
       }
 
-      // Kiểm tra và thanh toán MMP/MPB nếu đạt ngưỡng 5,000
-      if (savedTokenReward.reward_token === 'MMP' || savedTokenReward.reward_token === 'MPB') {
-        await this.checkAndPayTokenReward(referrerWallet.id, savedTokenReward.reward_token);
-      }
+      // Kiểm tra và thanh toán MMP nếu đạt ngưỡng 5,000
+      await this.checkAndPayTokenReward(referrerWallet.id, 'MMP');
 
-      return savedTokenReward;
+      return savedMmpReward;
 
     } catch (error) {
       console.error('Error creating referral reward:', error);
@@ -153,16 +152,21 @@ export class ReferralRewardService {
     }
   }
 
-  // Kiểm tra và thanh toán thưởng MMP/MPB khi đạt ngưỡng 5,000
+  // Kiểm tra và thanh toán thưởng MMP khi đạt ngưỡng 5,000
   private async checkAndPayTokenReward(walletId: number, tokenType: string): Promise<void> {
     try {
-      // Tính tổng mmp_received hoặc mpb_received từ swap_orders của người giới thiệu
+      // Chỉ xử lý MMP
+      if (tokenType !== 'MMP') {
+        return;
+      }
+
+      // Tính tổng mmp_received từ swap_orders của người giới thiệu
       const totalTokenReceived = await this.swapOrderRepository
         .createQueryBuilder('swap')
         .where('swap.wallet_id = :walletId', { walletId })
         .andWhere('swap.output_token = :tokenType', { tokenType })
         .andWhere('swap.status = :status', { status: 'completed' })
-        .select(`SUM(swap.${tokenType.toLowerCase()}_received)`, 'total')
+        .select('SUM(swap.mmp_received)', 'total')
         .getRawOne();
 
       const totalAmount = parseFloat(totalTokenReceived?.total || '0');
@@ -180,6 +184,11 @@ export class ReferralRewardService {
   // Thanh toán tất cả thưởng chưa thanh toán cho một loại token
   private async payAllPendingRewards(walletId: number, tokenType: string): Promise<void> {
     try {
+      // Chỉ xử lý MMP
+      if (tokenType !== 'MMP') {
+        return;
+      }
+
       // Lấy tất cả thưởng chưa thanh toán
       const pendingRewards = await this.referralRewardRepository.find({
         where: {
@@ -197,18 +206,8 @@ export class ReferralRewardService {
       // Tính tổng số lượng thưởng
       const totalAmount = pendingRewards.reduce((sum, reward) => sum + parseFloat(reward.reward_amount.toString()), 0);
 
-      // Gửi token
-      let txHash: string;
-      switch (tokenType) {
-        case 'MMP':
-          txHash = await this.sendMMPToReferrer(pendingRewards[0].referrer_wallet.sol_address, totalAmount);
-          break;
-        case 'MPB':
-          txHash = await this.sendMPBToReferrer(pendingRewards[0].referrer_wallet.sol_address, totalAmount);
-          break;
-        default:
-          return;
-      }
+      // Gửi MMP
+      const txHash = await this.sendMMPToReferrer(pendingRewards[0].referrer_wallet.sol_address, totalAmount);
 
       // Cập nhật trạng thái tất cả thưởng đã thanh toán
       for (const reward of pendingRewards) {
@@ -241,7 +240,7 @@ export class ReferralRewardService {
     }
   }
 
-  // Thanh toán referral reward (gửi token MMP hoặc MPB hoặc SOL)
+  // Thanh toán referral reward (gửi token MMP hoặc SOL)
   async payReferralReward(rewardId: number): Promise<boolean> {
     try {
       const reward = await this.referralRewardRepository.findOne({
@@ -258,9 +257,6 @@ export class ReferralRewardService {
       switch (reward.reward_token) {
         case 'MMP':
           txHash = await this.sendMMPToReferrer(reward.referrer_wallet.sol_address, reward.reward_amount);
-          break;
-        case 'MPB':
-          txHash = await this.sendMPBToReferrer(reward.referrer_wallet.sol_address, reward.reward_amount);
           break;
         case 'SOL':
           txHash = await this.sendSOLToReferrer(reward.referrer_wallet.sol_address, reward.reward_amount);
@@ -479,7 +475,6 @@ export class ReferralRewardService {
       // Khởi tạo giá trị mặc định
       let totalRewardSol = 0;
       let totalRewardMmp = 0;
-      let totalRewardMpb = 0;
 
       // Phân loại theo token type
       rewardStats.forEach(stat => {
@@ -491,9 +486,6 @@ export class ReferralRewardService {
           case 'MMP':
             totalRewardMmp = amount;
             break;
-          case 'MPB':
-            totalRewardMpb = amount;
-            break;
         }
       });
 
@@ -503,7 +495,7 @@ export class ReferralRewardService {
         created_at: new Date(walletData.created_at),
         total_reward_sol: totalRewardSol,
         total_reward_mmp: totalRewardMmp,
-        total_reward_mpb: totalRewardMpb
+        total_reward_mpb: 0 // Luôn là 0 vì không còn trả MPB
       });
     }
 
@@ -511,7 +503,7 @@ export class ReferralRewardService {
       total_referrals: parseInt(totalReferrals?.count || '0'),
       total_reward_sol: 0,
       total_reward_mmp: 0,
-      total_reward_mpb: 0,
+      total_reward_mpb: 0, // Luôn là 0 vì không còn trả MPB
       referred_wallets: referredWallets
     };
 
@@ -519,7 +511,7 @@ export class ReferralRewardService {
     referredWallets.forEach(wallet => {
       statistics.total_reward_sol += wallet.total_reward_sol;
       statistics.total_reward_mmp += wallet.total_reward_mmp;
-      statistics.total_reward_mpb += wallet.total_reward_mpb;
+      // total_reward_mpb luôn là 0
     });
 
     return statistics;
