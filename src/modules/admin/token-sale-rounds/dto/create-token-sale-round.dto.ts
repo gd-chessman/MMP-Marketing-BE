@@ -1,9 +1,5 @@
 import { IsString, IsNumber, IsDateString, IsNotEmpty, Min, MaxLength, IsEnum } from 'class-validator';
-
-export enum CoinType {
-  MMP = 'MMP',
-  MPB = 'MPB'
-}
+import { TokenType } from '../../../token-sale-rounds/token-sale-round.entity';
 
 export class CreateTokenSaleRoundDto {
   @IsString()
@@ -15,9 +11,9 @@ export class CreateTokenSaleRoundDto {
   @Min(0)
   quantity: number;
 
-  @IsEnum(CoinType)
+  @IsEnum(TokenType)
   @IsNotEmpty()
-  coin: CoinType;
+  coin: TokenType;
 
   @IsDateString()
   time_start: string;

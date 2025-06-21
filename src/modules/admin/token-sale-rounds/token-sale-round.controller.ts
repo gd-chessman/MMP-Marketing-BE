@@ -13,4 +13,9 @@ export class TokenSaleRoundController {
   async create(@Body() createTokenSaleRoundDto: CreateTokenSaleRoundDto): Promise<TokenSaleRound> {
     return this.tokenSaleRoundService.create(createTokenSaleRoundDto);
   }
+
+  @Get()
+  async findAll(): Promise<TokenSaleRound[]> {
+    return this.tokenSaleRoundService.findAll();
+  }
 }

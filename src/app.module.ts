@@ -17,6 +17,7 @@ import { UserStakeModule } from './modules/user-stakes/user-stake.module';
 import { DepositWithdrawModule } from './modules/deposit-withdraws/deposit-withdraw.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { WebsocketModule } from './modules/websocket/websocket.module';
+import { TokenSaleRoundModule } from './modules/token-sale-rounds/token-sale-round.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { WebsocketModule } from './modules/websocket/websocket.module';
     DepositWithdrawModule,
     AdminModule,
     WebsocketModule,
+    TokenSaleRoundModule,
   ],
   controllers: [AppController], // Các controller của ứng dụng
   providers: [AppService]

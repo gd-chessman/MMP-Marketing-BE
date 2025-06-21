@@ -57,4 +57,12 @@ export class TokenSaleRoundService {
 
     return this.tokenSaleRoundRepository.save(tokenSaleRound);
   }
+
+  async findAll(): Promise<TokenSaleRound[]> {
+    return this.tokenSaleRoundRepository.find({
+      order: {
+        created_at: 'DESC'
+      }
+    });
+  }
 }
