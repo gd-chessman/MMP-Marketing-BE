@@ -62,7 +62,7 @@ export class Wallet {
 
   @BeforeInsert()
   generateReferralCode() {
-    if (!this.referral_code) {
+    if (!this.referral_code && this.user_id !== null) {
       // Tạo mã 8 ký tự chữ và số
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
       let result = '';
