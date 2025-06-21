@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TokenSaleRound, TokenType } from './token-sale-round.entity';
+import { TokenSaleRound, TokenType, Status } from './token-sale-round.entity';
 import { CreateTokenSaleRoundDto } from '../admin/token-sale-rounds/dto/create-token-sale-round.dto';
 import { TokenSaleStatisticsDto, TokenSaleStatisticsSummaryDto } from './dto/token-sale-statistics.dto';
 
@@ -91,5 +91,92 @@ export class TokenSaleRoundService {
     };
 
     return response;
+  }
+
+  /**
+   * Lấy thống kê token sale cho tất cả rounds theo status
+   */
+  async getTokenSaleStatisticsByStatus(status?: Status): Promise<{ rounds: TokenSaleStatisticsDto[], summary: TokenSaleStatisticsSummaryDto }> {
+    // Lấy tất cả rounds
+    const allRounds = await this.tokenSaleRoundRepository.find({
+      order: {
+        created_at: 'DESC'
+      }
+    });
+
+    // Lọc rounds theo status nếu có, nếu không thì lấy tất cả
+    const filteredRounds = status ? allRounds.filter(round => round.status === status) : allRounds;
+
+    if (filteredRounds.length === 0) {
+      return {
+        rounds: [],
+        summary: {
+          total_rounds: 0,
+          active_rounds: 0,
+          completed_rounds: 0,
+          total_mmp_sold_all_rounds: 0,
+          total_mpb_sold_all_rounds: 0,
+          total_mmp_referral_rewards_all_rounds: 0,
+          total_mpb_referral_rewards_all_rounds: 0,
+          total_mmp_net_sold_all_rounds: 0,
+          total_mpb_net_sold_all_rounds: 0,
+          total_swap_orders_all_rounds: 0,
+          total_referral_rewards_all_rounds: 0,
+          last_updated: new Date()
+        }
+      };
+    }
+
+    // Lấy thống kê cho từng round
+    const roundsStatistics: TokenSaleStatisticsDto[] = [];
+    let totalMmpSold = 0;
+    let totalMpbSold = 0;
+    let totalMmpReferralRewards = 0;
+    let totalMpbReferralRewards = 0;
+    let totalSwapOrders = 0;
+    let totalReferralRewards = 0;
+    let activeRounds = 0;
+    let completedRounds = 0;
+
+    for (const round of filteredRounds) {
+      const roundStats = await this.getTokenSaleStatistics(round.id);
+      roundsStatistics.push(roundStats);
+
+      // Cộng dồn thống kê
+      totalMmpSold += roundStats.mmp_sold_from_swap;
+      totalMpbSold += roundStats.mpb_sold_from_swap;
+      totalMmpReferralRewards += roundStats.mmp_given_as_referral;
+      totalMpbReferralRewards += roundStats.mpb_given_as_referral;
+      totalSwapOrders += roundStats.total_swap_orders;
+      totalReferralRewards += roundStats.total_referral_rewards;
+
+      // Đếm số rounds theo status
+      if (round.status === Status.ONGOING) {
+        activeRounds++;
+      } else if (round.status === Status.ENDED) {
+        completedRounds++;
+      }
+    }
+
+    // Tạo summary
+    const summary: TokenSaleStatisticsSummaryDto = {
+      total_rounds: filteredRounds.length,
+      active_rounds: activeRounds,
+      completed_rounds: completedRounds,
+      total_mmp_sold_all_rounds: totalMmpSold,
+      total_mpb_sold_all_rounds: totalMpbSold,
+      total_mmp_referral_rewards_all_rounds: totalMmpReferralRewards,
+      total_mpb_referral_rewards_all_rounds: totalMpbReferralRewards,
+      total_mmp_net_sold_all_rounds: totalMmpSold + totalMmpReferralRewards,
+      total_mpb_net_sold_all_rounds: totalMpbSold + totalMpbReferralRewards,
+      total_swap_orders_all_rounds: totalSwapOrders,
+      total_referral_rewards_all_rounds: totalReferralRewards,
+      last_updated: new Date()
+    };
+
+    return {
+      rounds: roundsStatistics,
+      summary
+    };
   }
 }
