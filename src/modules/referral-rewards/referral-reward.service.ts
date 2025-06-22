@@ -435,22 +435,37 @@ export class ReferralRewardService {
 
   // Lấy thống kê referral rewards của một wallet
   async getReferralStatistics(walletId: number): Promise<ReferralStatisticsDto> {
-    // Lấy tổng số người đã giới thiệu (unique referred wallets)
-    const totalReferrals = await this.referralRewardRepository
-      .createQueryBuilder('reward')
-      .where('reward.referrer_wallet_id = :walletId', { walletId })
-      .select('COUNT(DISTINCT reward.referred_wallet_id)', 'count')
+    // Lấy thông tin ví của người giới thiệu để lấy referral_code
+    const referrerWallet = await this.walletRepository.findOne({
+      where: { id: walletId },
+      select: ['referral_code']
+    });
+
+    if (!referrerWallet?.referral_code) {
+      return {
+        total_referrals: 0,
+        total_reward_sol: 0,
+        total_reward_mmp: 0,
+        total_reward_mpb: 0,
+        referred_wallets: []
+      };
+    }
+
+    // Lấy tổng số người đã được giới thiệu (từ bảng wallets)
+    const totalReferrals = await this.walletRepository
+      .createQueryBuilder('wallet')
+      .where('wallet.referred_by = :referralCode', { referralCode: referrerWallet.referral_code })
+      .select('COUNT(*)', 'count')
       .getRawOne();
 
-    // Lấy thông tin chi tiết về những người đã được giới thiệu
-    const referredWalletsData = await this.referralRewardRepository
-      .createQueryBuilder('reward')
-      .leftJoin('reward.referred_wallet', 'referred_wallet')
-      .where('reward.referrer_wallet_id = :walletId', { walletId })
+    // Lấy thông tin chi tiết về những người đã được giới thiệu (từ bảng wallets)
+    const referredWalletsData = await this.walletRepository
+      .createQueryBuilder('wallet')
+      .where('wallet.referred_by = :referralCode', { referralCode: referrerWallet.referral_code })
       .select([
-        'DISTINCT referred_wallet.id as wallet_id',
-        'referred_wallet.sol_address as sol_address',
-        'referred_wallet.created_at as created_at'
+        'wallet.id as wallet_id',
+        'wallet.sol_address as sol_address',
+        'wallet.created_at as created_at'
       ])
       .getRawMany();
 
@@ -459,7 +474,7 @@ export class ReferralRewardService {
     for (const walletData of referredWalletsData) {
       const referredWalletId = walletData.wallet_id;
       
-      // Lấy tổng reward theo từng loại token từ người này
+      // Lấy tổng reward theo từng loại token từ người này (chỉ tính những reward đã thanh toán)
       const rewardStats = await this.referralRewardRepository
         .createQueryBuilder('reward')
         .where('reward.referrer_wallet_id = :walletId', { walletId })
