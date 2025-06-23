@@ -110,6 +110,13 @@ export class AuthService {
         //     await this.walletRepository.save(wallet);
         // }
 
+        if(!user) {
+            throw new BadRequestException('User not found');
+        }
+        if(!wallet) {
+            throw new BadRequestException('Wallet not found');
+        }
+
         const payload = { 
             user_id: user.id,
             wallet_id: wallet.id,
