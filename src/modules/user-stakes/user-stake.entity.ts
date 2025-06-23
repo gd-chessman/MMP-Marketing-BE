@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn, UpdateDateColumn } from 'typeorm';
 import { Wallet } from '../wallets/wallet.entity';
 import { StakingPlan } from '../staking-plans/staking-plan.entity';
 
@@ -12,9 +12,6 @@ export enum UserStakeStatus {
 export class UserStake {
   @PrimaryGeneratedColumn()
   id: number;
-
-  @Column({ type: 'varchar' })
-  name: string;
 
   @Column({ type: 'int' })
   wallet_id: number;
@@ -30,8 +27,23 @@ export class UserStake {
   @JoinColumn({ name: 'staking_plan_id' })
   staking_plan: StakingPlan;
 
+  @Column({ type: 'bigint' })
+  stake_id: number;
+
+  @Column({ type: 'varchar' })
+  stake_account_pda: string;
+
+  @Column({ type: 'varchar', unique: true })
+  staking_tx_signature: string;
+
+  @Column({ type: 'varchar', unique: true, nullable: true })
+  unstaking_tx_signature: string;
+
   @Column({ type: 'decimal', precision: 20, scale: 8 })
   amount_staked: number;
+
+  @Column({ type: 'decimal', precision: 20, scale: 8, nullable: true })
+  amount_claimed: number;
 
   @Column({ type: 'date' })
   start_date: Date;
@@ -39,16 +51,15 @@ export class UserStake {
   @Column({ type: 'date' })
   end_date: Date;
 
-  @Column({ type: 'date', nullable: true })
-  last_claimed_at: Date;
-
   @Column({
     type: 'enum',
     enum: UserStakeStatus,
-    default: UserStakeStatus.ACTIVE
   })
   status: UserStakeStatus;
 
   @CreateDateColumn()
   created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
 } 
