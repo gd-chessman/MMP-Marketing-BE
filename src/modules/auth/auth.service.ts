@@ -72,26 +72,26 @@ export class AuthService {
         });
 
         // Create new user if not exists
-        if (!user) {
-            try {
-                user = this.userRepository.create({
-                    telegram_id: telegramId,
-                });
-                await this.userRepository.save(user);
-            } catch (error) {
-                if (error.code === '23505') { // PostgreSQL unique violation error code
-                    // If user was created by another request, try to fetch it again
-                    user = await this.userRepository.findOne({
-                        where: { telegram_id: telegramId }
-                    });
-                    if (!user) {
-                        this.logger.error('User already exists');
-                    }
-                } else {
-                    throw error;
-                }
-            }
-        }
+        // if (!user) {
+        //     try {
+        //         user = this.userRepository.create({
+        //             telegram_id: telegramId,
+        //         });
+        //         await this.userRepository.save(user);
+        //     } catch (error) {
+        //         if (error.code === '23505') { // PostgreSQL unique violation error code
+        //             // If user was created by another request, try to fetch it again
+        //             user = await this.userRepository.findOne({
+        //                 where: { telegram_id: telegramId }
+        //             });
+        //             if (!user) {
+        //                 this.logger.error('User already exists');
+        //             }
+        //         } else {
+        //             throw error;
+        //         }
+        //     }
+        // }
 
         // Check if wallet exists for user
         let wallet = await this.walletRepository.findOne({
@@ -99,16 +99,16 @@ export class AuthService {
         });
 
         // Create new wallet if not exists
-        if (!wallet) {
-            const solanaWallet = this.generateSolanaWallet();
-            wallet = this.walletRepository.create({
-                user_id: user.id,
-                sol_address: solanaWallet.publicKey,
-                private_key: solanaWallet.privateKey,
-                referred_by: ref_code,
-            });
-            await this.walletRepository.save(wallet);
-        }
+        // if (!wallet) {
+        //     const solanaWallet = this.generateSolanaWallet();
+        //     wallet = this.walletRepository.create({
+        //         user_id: user.id,
+        //         sol_address: solanaWallet.publicKey,
+        //         private_key: solanaWallet.privateKey,
+        //         referred_by: ref_code,
+        //     });
+        //     await this.walletRepository.save(wallet);
+        // }
 
         const payload = { 
             user_id: user.id,
