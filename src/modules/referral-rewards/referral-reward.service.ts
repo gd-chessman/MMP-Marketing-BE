@@ -525,6 +525,7 @@ export class ReferralRewardService {
       // Khởi tạo giá trị mặc định
       let totalRewardSol = 0;
       let totalRewardMmp = 0;
+      let totalRewardMpb = 0;
 
       // Phân loại theo token type
       rewardStats.forEach(stat => {
@@ -536,6 +537,9 @@ export class ReferralRewardService {
           case 'MMP':
             totalRewardMmp = amount;
             break;
+          case 'MPB':
+            totalRewardMpb = amount;
+            break;
         }
       });
 
@@ -545,7 +549,7 @@ export class ReferralRewardService {
         created_at: new Date(walletData.created_at),
         total_reward_sol: totalRewardSol,
         total_reward_mmp: totalRewardMmp,
-        total_reward_mpb: 0 // Luôn là 0 vì không còn trả MPB
+        total_reward_mpb: totalRewardMpb
       });
     }
 
@@ -553,7 +557,7 @@ export class ReferralRewardService {
       total_referrals: parseInt(totalReferrals?.count || '0'),
       total_reward_sol: 0,
       total_reward_mmp: 0,
-      total_reward_mpb: 0, // Luôn là 0 vì không còn trả MPB
+      total_reward_mpb: 0,
       referred_wallets: referredWallets
     };
 
@@ -561,7 +565,7 @@ export class ReferralRewardService {
     referredWallets.forEach(wallet => {
       statistics.total_reward_sol += wallet.total_reward_sol;
       statistics.total_reward_mmp += wallet.total_reward_mmp;
-      // total_reward_mpb luôn là 0
+      statistics.total_reward_mpb += wallet.total_reward_mpb;
     });
 
     return statistics;
