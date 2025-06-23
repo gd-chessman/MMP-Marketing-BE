@@ -199,7 +199,7 @@ export class ReferralRewardService {
       console.log(`Total MPB received by referrer:`, totalMpbAmount);
 
       // Nếu đạt ngưỡng 5,000 cho MMP hoặc MPB, thanh toán tất cả thưởng tích lũy
-      if (totalMmpAmount >= 50 || totalMpbAmount >= 50) {
+      if (totalMmpAmount >= 5000 || totalMpbAmount >= 5000) {
         // Thanh toán cả MMP và MPB nếu có thưởng tích lũy
         await this.payAllPendingRewards(walletId, 'MMP');
         await this.payAllPendingRewards(walletId, 'MPB');
