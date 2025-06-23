@@ -76,7 +76,7 @@ export class ReferralRewardService {
           rewardToken = 'MMP';
           break;
         case 'MPB':
-          rewardAmount = swapOrder.mpb_received ? swapOrder.mpb_received * rewardRate : 0;
+          rewardAmount = swapOrder.mpb_received ? swapOrder.mpb_received * (rewardRate * 0.5) : 0;
           rewardToken = 'MPB';
           break;
         default:
@@ -103,7 +103,12 @@ export class ReferralRewardService {
       let savedSolReward = null;
       switch (swapOrder.input_token) {
         case 'SOL':
-          const solRewardAmount = swapOrder.input_amount * rewardRate;
+          let solRewardAmount = swapOrder.input_amount * rewardRate;
+          
+          // Giảm 50% thưởng SOL nếu output_token là MPB
+          if (swapOrder.output_token === 'MPB') {
+            solRewardAmount = solRewardAmount * 0.5;
+          }
           
           const solReferralReward = this.referralRewardRepository.create({
             referrer_wallet_id: referrerWallet.id,
@@ -121,7 +126,12 @@ export class ReferralRewardService {
           // Quy đổi USDT/USDC sang SOL với tỷ giá 1 SOL = $
           const usdValue = swapOrder.input_amount; // USDT/USDC có giá trị 1:1 với USD
           const solEquivalent = usdValue / priceSolUSD; // 
-          const usdtUsdcRewardAmount = solEquivalent * rewardRate;
+          let usdtUsdcRewardAmount = solEquivalent * rewardRate;
+          
+          // Giảm 50% thưởng SOL nếu output_token là MPB
+          if (swapOrder.output_token === 'MPB') {
+            usdtUsdcRewardAmount = usdtUsdcRewardAmount * 0.5;
+          }
           
           const usdtUsdcReferralReward = this.referralRewardRepository.create({
             referrer_wallet_id: referrerWallet.id,
