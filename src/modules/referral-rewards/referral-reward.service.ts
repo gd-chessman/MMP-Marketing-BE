@@ -15,6 +15,7 @@ import { ReferralStatisticsDto, ReferredWalletDto } from './dto/referral-statist
 export class ReferralRewardService {
   private readonly connection: Connection;
   private readonly mmpAuthorityKeypair: Keypair;
+  private readonly solAuthorityKeypair: Keypair;
 
   constructor(
     @InjectRepository(ReferralReward)
@@ -28,6 +29,9 @@ export class ReferralRewardService {
     this.connection = new Connection(this.configService.get('SOLANA_RPC_URL'));
     const mmpAuthorityPrivateKey = this.configService.get<string>('MMP_AUTHORITY_PRIVATE_KEY');
     this.mmpAuthorityKeypair = Keypair.fromSecretKey(bs58.decode(mmpAuthorityPrivateKey));
+    
+    const solAuthorityPrivateKey = this.configService.get<string>('SOL_AUTHORITY_PRIVATE_KEY');
+    this.solAuthorityKeypair = Keypair.fromSecretKey(bs58.decode(solAuthorityPrivateKey));
   }
 
   // Tạo referral reward khi swap thành công
@@ -397,7 +401,7 @@ export class ReferralRewardService {
   // Gửi SOL cho người giới thiệu
   private async sendSOLToReferrer(toAddress: string, amount: number): Promise<string> {
     const toPublicKey = new PublicKey(toAddress);
-    const authorityPublicKey = this.mmpAuthorityKeypair.publicKey;
+    const authorityPublicKey = this.solAuthorityKeypair.publicKey;
     
     // Chuyển đổi SOL sang lamports (1 SOL = 10^9 lamports)
     const lamports = Math.floor(amount * 1e9);
@@ -416,7 +420,7 @@ export class ReferralRewardService {
     tx.recentBlockhash = blockhash;
 
     // Ký và gửi transaction
-    const signature = await this.connection.sendTransaction(tx, [this.mmpAuthorityKeypair], {
+    const signature = await this.connection.sendTransaction(tx, [this.solAuthorityKeypair], {
       skipPreflight: false,
       preflightCommitment: 'confirmed',
     });
