@@ -655,4 +655,74 @@ export class UserStakeService {
       data: instructionData,
     });
   }
+
+  /**
+   * Lấy thống kê stake của ví và tổng số người đang stake, tổng stake tháng này và tháng trước
+   */
+  async getStakeStatistics(walletId: number) {
+    // Xác định khoảng thời gian tháng này và tháng trước
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+    const [
+      totalStaked, 
+      activeStakersCount, 
+      totalStakedThisMonth, 
+      totalStakedLastMonth,
+      totalClaimedThisMonth,
+      totalClaimedLastMonth
+    ] = await Promise.all([
+      // Tổng amount_staked của ví
+      this.userStakeRepository
+        .createQueryBuilder('stake')
+        .select('SUM(stake.amount_staked)', 'total')
+        .where('stake.wallet_id = :walletId', { walletId })
+        .getRawOne(),
+      // Số lượng người đang stake
+      this.userStakeRepository.count({ where: { status: UserStakeStatus.ACTIVE } }),
+      // Tổng stake tháng này
+      this.userStakeRepository
+        .createQueryBuilder('stake')
+        .select('SUM(stake.amount_staked)', 'total')
+        .where('stake.wallet_id = :walletId', { walletId })
+        .andWhere('stake.created_at >= :startOfThisMonth', { startOfThisMonth })
+        .getRawOne(),
+      // Tổng stake tháng trước
+      this.userStakeRepository
+        .createQueryBuilder('stake')
+        .select('SUM(stake.amount_staked)', 'total')
+        .where('stake.wallet_id = :walletId', { walletId })
+        .andWhere('stake.created_at >= :startOfLastMonth', { startOfLastMonth })
+        .andWhere('stake.created_at <= :endOfLastMonth', { endOfLastMonth })
+        .getRawOne(),
+      // Tổng amount_claimed tháng này
+      this.userStakeRepository
+        .createQueryBuilder('stake')
+        .select('SUM(stake.amount_claimed)', 'total')
+        .where('stake.wallet_id = :walletId', { walletId })
+        .andWhere('stake.updated_at >= :startOfThisMonth', { startOfThisMonth })
+        .andWhere('stake.amount_claimed IS NOT NULL')
+        .getRawOne(),
+      // Tổng amount_claimed tháng trước
+      this.userStakeRepository
+        .createQueryBuilder('stake')
+        .select('SUM(stake.amount_claimed)', 'total')
+        .where('stake.wallet_id = :walletId', { walletId })
+        .andWhere('stake.updated_at >= :startOfLastMonth', { startOfLastMonth })
+        .andWhere('stake.updated_at <= :endOfLastMonth', { endOfLastMonth })
+        .andWhere('stake.amount_claimed IS NOT NULL')
+        .getRawOne(),
+    ]);
+
+    return {
+      total_staked_mmp: parseFloat(totalStaked?.total || '0'),
+      active_stakers_count: activeStakersCount,
+      total_staked_this_month: parseFloat(totalStakedThisMonth?.total || '0'),
+      total_staked_last_month: parseFloat(totalStakedLastMonth?.total || '0'),
+      total_claimed_this_month: parseFloat(totalClaimedThisMonth?.total || '0'),
+      total_claimed_last_month: parseFloat(totalClaimedLastMonth?.total || '0'),
+    };
+  }
 } 

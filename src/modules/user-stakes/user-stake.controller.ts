@@ -77,4 +77,13 @@ export class UserStakeController {
   async getMyStakes(@Request() req): Promise<UserStake[]> {
     return await this.userStakeService.findByWalletId(req.user.wallet.id);
   }
+
+  /**
+   * Lấy thống kê tổng quan về stake
+   */
+  @Get('statistics')
+  @UseGuards(JwtGuestGuard)
+  async getStakeStatistics(@Request() req) {
+    return await this.userStakeService.getStakeStatistics(req.user.wallet.id);
+  }
 } 
