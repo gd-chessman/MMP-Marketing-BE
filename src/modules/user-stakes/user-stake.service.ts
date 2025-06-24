@@ -680,8 +680,12 @@ export class UserStakeService {
         .select('SUM(stake.amount_staked)', 'total')
         .where('stake.wallet_id = :walletId', { walletId })
         .getRawOne(),
-      // Số lượng người đang stake
-      this.userStakeRepository.count({ where: { status: UserStakeStatus.ACTIVE } }),
+      // Số lượng ví unique đang stake
+      this.userStakeRepository
+        .createQueryBuilder('stake')
+        .select('COUNT(DISTINCT stake.wallet_id)', 'count')
+        .where('stake.status = :status', { status: UserStakeStatus.ACTIVE })
+        .getRawOne(),
       // Tổng stake tháng này
       this.userStakeRepository
         .createQueryBuilder('stake')
@@ -718,7 +722,7 @@ export class UserStakeService {
 
     return {
       total_staked_mmp: parseFloat(totalStaked?.total || '0'),
-      active_stakers_count: activeStakersCount,
+      active_stakers_count: parseInt(activeStakersCount?.count || '0'),
       total_staked_this_month: parseFloat(totalStakedThisMonth?.total || '0'),
       total_staked_last_month: parseFloat(totalStakedLastMonth?.total || '0'),
       total_claimed_this_month: parseFloat(totalClaimedThisMonth?.total || '0'),
