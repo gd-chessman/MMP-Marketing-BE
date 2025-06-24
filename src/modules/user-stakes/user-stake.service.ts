@@ -148,28 +148,26 @@ export class UserStakeService {
       const allowedTokenMint = new PublicKey(process.env.MMP_TOKEN_MINT || "FrbqVX4esWyfA4PvZngXKvbPenzMV7XVdLw6JdQMpTSC");
       const userTokenAccount = await getAssociatedTokenAddress(allowedTokenMint, userPublicKey);
       
+      // Kiểm tra số dư MMP token trước khi stake
+      const tokenAccountInfo = await this.connection.getTokenAccountBalance(userTokenAccount);
+      const userMMPBalance = tokenAccountInfo.value.uiAmount || 0;
+      const MMP_TOKEN_DECIMALS = 6;
+      const amountToStake = BigInt(amount_staked * (10 ** MMP_TOKEN_DECIMALS));
+      
+      if (userMMPBalance < amount_staked) {
+        throw new BadRequestException(
+          `Insufficient MMP tokens. Your balance: ${userMMPBalance} MMP, Required: ${amount_staked} MMP`
+        );
+      }
+      
       const [vaultPDA] = await PublicKey.findProgramAddress(
         [Buffer.from("vault")],
         this.programId
       );
-
-      // DEBUG LOGS
-      console.log('--- STAKE TRANSACTION ACCOUNTS ---');
-      console.log('user:', userPublicKey.toBase58());
-      console.log('stakeStatePDA:', stakeStatePDA.toBase58());
-      console.log('userStakePDA:', userStakePDA.toBase58());
-      console.log('userTokenAccount:', userTokenAccount.toBase58());
-      console.log('vault (native SPL):', vaultPDA.toBase58());
-      console.log('vaultPDA:', vaultPDA.toBase58());
-      console.log('mint:', allowedTokenMint.toBase58());
-      // END DEBUG LOGS
-
+      
       // Create instruction data
       const discriminator = Buffer.from(sha256.digest('global:stake')).slice(0, 8);
-      const MMP_TOKEN_DECIMALS = 8;
-      const amount = BigInt(amount_staked * (10 ** MMP_TOKEN_DECIMALS));
-      
-      const instructionArgs = new StakeInstruction({ amount, lock_months });
+      const instructionArgs = new StakeInstruction({ amount: amountToStake, lock_months });
       const instructionData = Buffer.concat([discriminator, borsh.serialize(stakeInstructionSchema, instructionArgs)]);
 
       const txInstruction = new TransactionInstruction({
@@ -327,6 +325,11 @@ export class UserStakeService {
       relations: ['staking_plan'],
       order: { created_at: 'DESC' },
     });
+
+    if (!stakes.length) {
+      throw new NotFoundException(`No stakes found for wallet ${walletId}`);
+    }
+
     return stakes;
   }
 
@@ -336,6 +339,19 @@ export class UserStakeService {
   ): Promise<{ transaction: string }> {
     const { amount_staked, lock_months } = prepareStakeDto;
     const userPublicKey = new PublicKey(wallet.sol_address);
+
+    // Kiểm tra số dư MMP token trước khi chuẩn bị transaction
+    const allowedTokenMint = new PublicKey(process.env.MMP_TOKEN_MINT || "FrbqVX4esWyfA4PvZngXKvbPenzMV7XVdLw6JdQMpTSC");
+    const userTokenAccount = await getAssociatedTokenAddress(allowedTokenMint, userPublicKey);
+    
+    const tokenAccountInfo = await this.connection.getTokenAccountBalance(userTokenAccount);
+    const userMMPBalance = tokenAccountInfo.value.uiAmount || 0;
+    
+    if (userMMPBalance < amount_staked) {
+      throw new BadRequestException(
+        `Insufficient MMP tokens. Your balance: ${userMMPBalance} MMP, Required: ${amount_staked} MMP`
+      );
+    }
 
     // Fetch on-chain data to build the transaction
     const [stakeStatePDA] = await PublicKey.findProgramAddress([Buffer.from("stake_state")], this.programId);
@@ -433,7 +449,7 @@ export class UserStakeService {
       // Decode instruction data
       const instructionData = transaction.instructions[0].data.slice(8);
       const decodedInstruction = borsh.deserialize(stakeInstructionSchema, StakeInstruction, instructionData);
-      const amount_staked = Number(decodedInstruction.amount) / (10 ** 8);
+      const amount_staked = Number(decodedInstruction.amount) / (10 ** 6);
       const lock_months = decodedInstruction.lock_months;
 
       // 4. Save to database
@@ -593,7 +609,7 @@ export class UserStakeService {
     const userTokenAccount = await getAssociatedTokenAddress(allowedTokenMint, userPublicKey);
 
     const discriminator = Buffer.from(sha256.digest('global:stake')).slice(0, 8);
-    const MMP_TOKEN_DECIMALS = 8;
+    const MMP_TOKEN_DECIMALS = 6;
     const amount = BigInt(amount_staked * (10 ** MMP_TOKEN_DECIMALS));
     const instructionArgs = new StakeInstruction({ amount, lock_months });
     const instructionData = Buffer.concat([discriminator, borsh.serialize(stakeInstructionSchema, instructionArgs)]);
