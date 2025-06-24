@@ -325,11 +325,7 @@ export class UserStakeService {
       relations: ['staking_plan'],
       order: { created_at: 'DESC' },
     });
-
-    if (!stakes.length) {
-      throw new NotFoundException(`No stakes found for wallet ${walletId}`);
-    }
-
+    
     return stakes;
   }
 
