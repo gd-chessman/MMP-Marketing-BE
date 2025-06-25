@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, ClassSerializerInterceptor, UseInterceptors, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, ClassSerializerInterceptor, UseInterceptors, ParseIntPipe, Put } from '@nestjs/common';
 import { TokenSaleRoundService } from './token-sale-round.service';
 import { CreateTokenSaleRoundDto } from './dto/create-token-sale-round.dto';
-import { Status, TokenSaleRound } from '../../token-sale-rounds/token-sale-round.entity';
+import { UpdateTokenSaleRoundDto } from './dto/update-token-sale-round.dto';
 import { JwtAdminGuard } from '../auth/jwt-admin.guard';
-import { TokenSaleStatisticsDto, TokenSaleStatisticsSummaryDto } from '../../token-sale-rounds/dto/token-sale-statistics.dto';
 import { SearchTokenSaleRoundsDto } from './dto/search-token-sale-rounds.dto';
+import { TokenSaleStatisticsDto } from '../../token-sale-rounds/dto/token-sale-statistics.dto';
+import { TokenSaleOverviewDto } from './dto/token-sale-overview.dto';
 
 @Controller('admin/token-sale-rounds')
 @UseGuards(JwtAdminGuard)
@@ -23,6 +24,16 @@ export class TokenSaleRoundController {
   }
 
 
+  @Put(':id')
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateTokenSaleRoundDto: UpdateTokenSaleRoundDto) {
+    return this.tokenSaleRoundService.update(id, updateTokenSaleRoundDto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.tokenSaleRoundService.remove(id);
+  }
+
   /**
    * Lấy thống kê token sale cho một round cụ thể
    */
@@ -32,12 +43,10 @@ export class TokenSaleRoundController {
   }
 
   /**
-   * Lấy token sale rounds theo status và thống kê tổng hợp
+   * Lấy thống kê tổng quan token sale cho tất cả rounds
    */
   @Get('statistics')
-  async getTokenSaleStatisticsByStatus(
-    @Query('status') status?: Status
-  ): Promise<{ rounds: TokenSaleStatisticsDto[], summary: TokenSaleStatisticsSummaryDto }> {
-    return this.tokenSaleRoundService.getTokenSaleStatisticsByStatus(status);
+  async getTokenSaleStatisticsByStatus(): Promise<TokenSaleOverviewDto> {
+    return this.tokenSaleRoundService.getTokenSaleStatisticsByStatus();
   }
 }

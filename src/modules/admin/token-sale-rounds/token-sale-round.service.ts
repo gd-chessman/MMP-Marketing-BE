@@ -3,7 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TokenSaleRound } from '../../token-sale-rounds/token-sale-round.entity';
 import { CreateTokenSaleRoundDto } from './dto/create-token-sale-round.dto';
+import { UpdateTokenSaleRoundDto } from './dto/update-token-sale-round.dto';
 import { TokenSaleStatisticsDto, TokenSaleStatisticsSummaryDto } from 'src/modules/token-sale-rounds/dto/token-sale-statistics.dto';
+import { TokenSaleOverviewDto } from './dto/token-sale-overview.dto';
 import { TokenType } from '../../token-sale-rounds/token-sale-round.entity';
 import { Status } from '../../token-sale-rounds/token-sale-round.entity';
 import { SearchTokenSaleRoundsDto } from './dto/search-token-sale-rounds.dto';
@@ -62,6 +64,82 @@ export class TokenSaleRoundService {
     return this.tokenSaleRoundRepository.save(tokenSaleRound);
   }
 
+  async update(id: number, updateTokenSaleRoundDto: UpdateTokenSaleRoundDto): Promise<TokenSaleRound> {
+    const tokenSaleRound = await this.tokenSaleRoundRepository.findOne({ where: { id } });
+    
+    if (!tokenSaleRound) {
+      throw new NotFoundException(`Token sale round with ID ${id} not found`);
+    }
+
+    // Kiểm tra overlap nếu có thay đổi thời gian
+    if (updateTokenSaleRoundDto.time_start || updateTokenSaleRoundDto.time_end) {
+      const newStartTime = updateTokenSaleRoundDto.time_start ? new Date(updateTokenSaleRoundDto.time_start) : new Date(tokenSaleRound.time_start);
+      const newEndTime = updateTokenSaleRoundDto.time_end ? new Date(updateTokenSaleRoundDto.time_end) : new Date(tokenSaleRound.time_end);
+      const coinType = updateTokenSaleRoundDto.coin || tokenSaleRound.coin;
+
+      // Lấy tất cả rounds khác cùng coin type (trừ round hiện tại)
+      const existingRounds = await this.tokenSaleRoundRepository.find({
+        where: { coin: coinType }
+      });
+
+      for (const existingRound of existingRounds) {
+        if (existingRound.id === id) continue; // Bỏ qua round hiện tại
+
+        const existingStartTime = new Date(existingRound.time_start);
+        const existingEndTime = new Date(existingRound.time_end);
+
+        // Kiểm tra overlap
+        if (newStartTime >= existingStartTime && newStartTime <= existingEndTime) {
+          throw new BadRequestException(
+            `Updated round start time (${newStartTime.toISOString()}) overlaps with existing round "${existingRound.round_name}" (${existingStartTime.toISOString()} - ${existingEndTime.toISOString()})`
+          );
+        }
+
+        if (newEndTime >= existingStartTime && newEndTime <= existingEndTime) {
+          throw new BadRequestException(
+            `Updated round end time (${newEndTime.toISOString()}) overlaps with existing round "${existingRound.round_name}" (${existingStartTime.toISOString()} - ${existingEndTime.toISOString()})`
+          );
+        }
+
+        if (newStartTime <= existingStartTime && newEndTime >= existingEndTime) {
+          throw new BadRequestException(
+            `Updated round completely overlaps existing round "${existingRound.round_name}" (${existingStartTime.toISOString()} - ${existingEndTime.toISOString()})`
+          );
+        }
+      }
+    }
+
+    // Cập nhật các trường
+    if (updateTokenSaleRoundDto.round_name !== undefined) {
+      tokenSaleRound.round_name = updateTokenSaleRoundDto.round_name;
+    }
+    
+    if (updateTokenSaleRoundDto.quantity !== undefined) {
+      tokenSaleRound.quantity = updateTokenSaleRoundDto.quantity.toString();
+    }
+    
+    if (updateTokenSaleRoundDto.coin !== undefined) {
+      tokenSaleRound.coin = updateTokenSaleRoundDto.coin;
+    }
+    
+    if (updateTokenSaleRoundDto.time_start !== undefined) {
+      tokenSaleRound.time_start = new Date(updateTokenSaleRoundDto.time_start);
+    }
+    
+    if (updateTokenSaleRoundDto.time_end !== undefined) {
+      tokenSaleRound.time_end = new Date(updateTokenSaleRoundDto.time_end);
+    }
+
+    return this.tokenSaleRoundRepository.save(tokenSaleRound);
+  }
+
+
+
+  async remove(id: number): Promise<void> {
+    const tokenSaleRound = await this.tokenSaleRoundRepository.findOne({ where: { id } });
+    await this.tokenSaleRoundRepository.remove(tokenSaleRound);
+  }
+
   async findAll(searchDto: SearchTokenSaleRoundsDto) {
     const { page = 1, limit = 10, search } = searchDto;
     const skip = (page - 1) * limit;
@@ -95,7 +173,6 @@ export class TokenSaleRoundService {
       }
     };
   }
-
 
   /**
    * Lấy thống kê token sale cho một round cụ thể
@@ -171,9 +248,9 @@ export class TokenSaleRoundService {
   }
 
   /**
-   * Lấy thống kê token sale cho tất cả rounds theo status
+   * Lấy thống kê tổng quan token sale cho tất cả rounds
    */
-  async getTokenSaleStatisticsByStatus(status?: Status): Promise<{ rounds: TokenSaleStatisticsDto[], summary: TokenSaleStatisticsSummaryDto }> {
+  async getTokenSaleStatisticsByStatus(): Promise<TokenSaleOverviewDto> {
     // Lấy tất cả rounds
     const allRounds = await this.tokenSaleRoundRepository.find({
       order: {
@@ -181,65 +258,75 @@ export class TokenSaleRoundService {
       }
     });
 
-    // Lọc rounds theo status nếu có, nếu không thì lấy tất cả
-    const filteredRounds = status ? allRounds.filter(round => round.status === status) : allRounds;
-
-    if (filteredRounds.length === 0) {
+    if (allRounds.length === 0) {
       return {
-        rounds: [],
-        summary: {
-          total_rounds: 0,
-          active_rounds: 0,
-          completed_rounds: 0,
-          total_mmp_sold_all_rounds: 0,
-          total_mpb_sold_all_rounds: 0,
-          total_mmp_referral_rewards_all_rounds: 0,
-          total_mpb_referral_rewards_all_rounds: 0,
-          total_mmp_net_sold_all_rounds: 0,
-          total_mpb_net_sold_all_rounds: 0,
-          total_swap_orders_all_rounds: 0,
-          total_referral_rewards_all_rounds: 0,
-          last_updated: new Date()
-        }
+        total_rounds: 0,
+        total_mmp_sold_all_rounds: 0,
+        total_mpb_sold_all_rounds: 0,
+        total_mmp_referral_rewards_all_rounds: 0,
+        total_mpb_referral_rewards_all_rounds: 0,
+        total_mmp_net_sold_all_rounds: 0,
+        total_mpb_net_sold_all_rounds: 0,
+        total_swap_orders_all_rounds: 0,
+        total_referral_rewards_all_rounds: 0,
+        last_updated: new Date()
       };
     }
 
-    // Lấy thống kê cho từng round
-    const roundsStatistics: TokenSaleStatisticsDto[] = [];
     let totalMmpSold = 0;
     let totalMpbSold = 0;
     let totalMmpReferralRewards = 0;
     let totalMpbReferralRewards = 0;
     let totalSwapOrders = 0;
     let totalReferralRewards = 0;
-    let activeRounds = 0;
-    let completedRounds = 0;
 
-    for (const round of filteredRounds) {
-      const roundStats = await this.getTokenSaleStatistics(round.id);
-      roundsStatistics.push(roundStats);
+    // Tính tổng thống kê từ tất cả rounds
+    for (const round of allRounds) {
+      // Thống kê từ swap orders trong khoảng thời gian của round, chỉ theo loại token của round
+      const swapOrderStats = await this.tokenSaleRoundRepository.query(`
+        SELECT 
+          SUM(CASE WHEN output_token = $1 AND status = 'completed' THEN 
+            CASE 
+              WHEN output_token = 'MMP' THEN mmp_received 
+              WHEN output_token = 'MPB' THEN mpb_received 
+              ELSE 0 
+            END
+          ELSE 0 END) as total_token_sold,
+          COUNT(CASE WHEN output_token = $1 AND status = 'completed' THEN 1 END) as total_swap_orders
+        FROM swap_orders 
+        WHERE created_at >= $2 AND created_at <= $3
+      `, [round.coin, round.time_start, round.time_end]);
 
-      // Cộng dồn thống kê
-      totalMmpSold += roundStats.mmp_sold_from_swap;
-      totalMpbSold += roundStats.mpb_sold_from_swap;
-      totalMmpReferralRewards += roundStats.mmp_given_as_referral;
-      totalMpbReferralRewards += roundStats.mpb_given_as_referral;
-      totalSwapOrders += roundStats.total_swap_orders;
-      totalReferralRewards += roundStats.total_referral_rewards;
+      // Thống kê từ referral rewards trong khoảng thời gian của round, chỉ theo loại token của round
+      const referralRewardStats = await this.tokenSaleRoundRepository.query(`
+        SELECT 
+          SUM(CASE WHEN reward_token = $1 AND status = 'paid' THEN reward_amount ELSE 0 END) as total_token_referral_rewards,
+          COUNT(CASE WHEN reward_token = $1 AND status = 'paid' THEN 1 END) as total_referral_rewards
+        FROM referral_rewards 
+        WHERE created_at >= $2 AND created_at <= $3
+      `, [round.coin, round.time_start, round.time_end]);
 
-      // Đếm số rounds theo status
-      if (round.status === Status.ONGOING) {
-        activeRounds++;
-      } else if (round.status === Status.ENDED) {
-        completedRounds++;
+      const totalTokenSold = parseFloat(swapOrderStats[0]?.total_token_sold || '0');
+      const totalTokenReferralRewards = parseFloat(referralRewardStats[0]?.total_token_referral_rewards || '0');
+      const totalSwapOrdersForRound = parseInt(swapOrderStats[0]?.total_swap_orders || '0');
+      const totalReferralRewardsForRound = parseInt(referralRewardStats[0]?.total_referral_rewards || '0');
+
+      // Cộng dồn thống kê theo loại token của round
+      if (round.coin === TokenType.MMP) {
+        totalMmpSold += totalTokenSold;
+        totalMmpReferralRewards += totalTokenReferralRewards;
+      } else if (round.coin === TokenType.MPB) {
+        totalMpbSold += totalTokenSold;
+        totalMpbReferralRewards += totalTokenReferralRewards;
       }
+
+      totalSwapOrders += totalSwapOrdersForRound;
+      totalReferralRewards += totalReferralRewardsForRound;
     }
 
-    // Tạo summary
-    const summary: TokenSaleStatisticsSummaryDto = {
-      total_rounds: filteredRounds.length,
-      active_rounds: activeRounds,
-      completed_rounds: completedRounds,
+    // Tạo response tổng quan
+    const overview: TokenSaleOverviewDto = {
+      total_rounds: allRounds.length,
       total_mmp_sold_all_rounds: totalMmpSold,
       total_mpb_sold_all_rounds: totalMpbSold,
       total_mmp_referral_rewards_all_rounds: totalMmpReferralRewards,
@@ -251,9 +338,6 @@ export class TokenSaleRoundService {
       last_updated: new Date()
     };
 
-    return {
-      rounds: roundsStatistics,
-      summary
-    };
+    return overview;
   }
 }
