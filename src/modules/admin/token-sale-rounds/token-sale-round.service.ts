@@ -135,9 +135,13 @@ export class TokenSaleRoundService {
 
 
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number): Promise<{ status: boolean, message: string }> {
     const tokenSaleRound = await this.tokenSaleRoundRepository.findOne({ where: { id } });
     await this.tokenSaleRoundRepository.remove(tokenSaleRound);
+    return {
+      status: true,
+      message: 'Token sale round deleted successfully'
+    };
   }
 
   async findAll(searchDto: SearchTokenSaleRoundsDto) {
