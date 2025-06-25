@@ -325,7 +325,7 @@ export class UserStakeService {
       relations: ['staking_plan'],
       order: { created_at: 'DESC' },
     });
-    
+
     return stakes;
   }
 
@@ -396,11 +396,39 @@ export class UserStakeService {
   ): Promise<UserStake> {
     const { signedTransaction, staking_plan_id } = executeStakeDto;
 
-    // 1. Decode and deserialize the transaction
-    const transactionBuffer = Buffer.from(signedTransaction, 'base64');
-    const transaction = Transaction.from(transactionBuffer);
+    // Validate input
+    if (!signedTransaction || typeof signedTransaction !== 'string') {
+      throw new BadRequestException('Invalid signed transaction format.');
+    }
+
+    // 1. Decode and deserialize the transaction with proper error handling
+    let transactionBuffer: Buffer;
+    let transaction: Transaction;
+    
+    try {
+      // Validate base64 format
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(signedTransaction)) {
+        throw new BadRequestException('Invalid base64 format for signed transaction.');
+      }
+      
+      transactionBuffer = Buffer.from(signedTransaction, 'base64');
+      
+      // Validate buffer length
+      if (transactionBuffer.length < 100) { // Minimum reasonable transaction size
+        throw new BadRequestException('Transaction buffer too small, may be corrupted.');
+      }
+      
+      transaction = Transaction.from(transactionBuffer);
+      
+    } catch (error) {
+      if (error.message.includes('Reached end of buffer')) {
+        throw new BadRequestException('Invalid transaction format: transaction data is corrupted or incomplete.');
+      }
+      throw new BadRequestException(`Failed to deserialize transaction: ${error.message}`);
+    }
 
     // 2. Security Checks
+    
     // Check #1: The first signature must be the user's
     if (!transaction.signatures[0] || !transaction.signatures[0].publicKey.equals(new PublicKey(wallet.sol_address))) {
       throw new UnauthorizedException("Transaction not signed by the correct user.");
@@ -413,7 +441,7 @@ export class UserStakeService {
 
     // Check #3 (Content Verification)
     if (transaction.instructions.length !== 1 || !transaction.instructions[0].programId.equals(this.programId)) {
-        throw new BadRequestException("Transaction content is invalid.");
+      throw new BadRequestException("Transaction content is invalid.");
     }
 
     // 3. Relay the transaction
@@ -472,9 +500,11 @@ export class UserStakeService {
           status: UserStakeStatus.ACTIVE,
       });
 
-      return await this.userStakeRepository.save(newUserStake);
+      const savedStake = await this.userStakeRepository.save(newUserStake);
+      
+      return savedStake;
     } catch (error) {
-      console.error('Failed to execute stake transaction:', error);
+      console.error('Failed to execute stake transaction:', error.message);
       
       // Kiểm tra lỗi insufficient lamports để hiển thị thông báo rõ ràng
       if (error.message && error.message.includes('insufficient lamports')) {
@@ -531,14 +561,41 @@ export class UserStakeService {
   ): Promise<UserStake> {
     const { signedTransaction, user_stake_id } = executeUnstakeDto;
     
+    // Validate input
+    if (!signedTransaction || typeof signedTransaction !== 'string') {
+      throw new BadRequestException('Invalid signed transaction format.');
+    }
+    
     // 1. Fetch the stake to update later
     const userStake = await this.userStakeRepository.findOne({ where: { id: user_stake_id } });
     if (!userStake) throw new NotFoundException(`Stake with ID ${user_stake_id} not found.`);
     if (userStake.wallet_id !== wallet.id) throw new UnauthorizedException('You are not the owner of this stake.');
     
-    // 2. Decode, verify, and check transaction
-    const transactionBuffer = Buffer.from(signedTransaction, 'base64');
-    const transaction = Transaction.from(transactionBuffer);
+    // 2. Decode, verify, and check transaction with proper error handling
+    let transactionBuffer: Buffer;
+    let transaction: Transaction;
+    
+    try {
+      // Validate base64 format
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(signedTransaction)) {
+        throw new BadRequestException('Invalid base64 format for signed transaction.');
+      }
+      
+      transactionBuffer = Buffer.from(signedTransaction, 'base64');
+      
+      // Validate buffer length
+      if (transactionBuffer.length < 100) { // Minimum reasonable transaction size
+        throw new BadRequestException('Transaction buffer too small, may be corrupted.');
+      }
+      
+      transaction = Transaction.from(transactionBuffer);
+    } catch (error) {
+      console.error('Transaction deserialization error:', error);
+      if (error.message.includes('Reached end of buffer')) {
+        throw new BadRequestException('Invalid transaction format: transaction data is corrupted or incomplete.');
+      }
+      throw new BadRequestException(`Failed to deserialize transaction: ${error.message}`);
+    }
 
     if (!transaction.signatures[0] || !transaction.signatures[0].publicKey.equals(new PublicKey(wallet.sol_address))) {
       throw new UnauthorizedException("Transaction not signed by the correct user.");
