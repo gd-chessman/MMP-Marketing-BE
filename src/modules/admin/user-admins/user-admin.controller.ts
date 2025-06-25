@@ -1,6 +1,9 @@
-import { Controller, Get, UseGuards, Request, UseInterceptors, ClassSerializerInterceptor } from '@nestjs/common';
+import { Controller, Get, Post, Delete, UseGuards, Request, UseInterceptors, ClassSerializerInterceptor, Body, Query, Param } from '@nestjs/common';
 import { JwtAdminGuard } from '../auth/jwt-admin.guard';
 import { UserAdminService } from './user-admin.service';
+import { CreateUserAdminDto } from './dto/create-user-admin.dto';
+import { SearchUserAdminsDto } from './dto/search-user-admins.dto';
+import { DeleteUserAdminDto } from './dto/delete-user-admin.dto';
 
 @Controller('admin/user-admins')
 @UseGuards(JwtAdminGuard)
@@ -11,5 +14,20 @@ export class UserAdminController {
   @Get('me')
   async getProfile(@Request() req) {
     return this.userAdminService.findById(req.user.id);
+  }
+
+  @Get()
+  async findAll(@Query() searchDto: SearchUserAdminsDto) {
+    return this.userAdminService.findAll(searchDto);
+  }
+
+  @Post()
+  async create(@Body() createUserAdminDto: CreateUserAdminDto, @Request() req) {
+    return this.userAdminService.create(createUserAdminDto, req.user);
+  }
+
+  @Delete(':id')
+  async delete(@Param() deleteUserAdminDto: DeleteUserAdminDto, @Request() req) {
+    return this.userAdminService.delete(deleteUserAdminDto, req.user);
   }
 }
