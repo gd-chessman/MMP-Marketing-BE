@@ -5,6 +5,7 @@ import { Wallet } from '../../wallets/wallet.entity';
 import { ReferralReward } from '../../referral-rewards/referral-reward.entity';
 import { ReferralRankingDto, ReferralRankingResponseDto } from './dto/referral-ranking.dto';
 import { SearchReferralRankingDto, RankingPeriod } from './dto/search-referral-ranking.dto';
+import { ReferralStatisticsDto } from './dto/referral-statistics.dto';
 
 @Injectable()
 export class ReferralService {
@@ -131,6 +132,74 @@ export class ReferralService {
         total,
         totalPages: Math.ceil(total / limit)
       }
+    };
+  }
+
+  async getReferralStatistics(): Promise<ReferralStatisticsDto> {
+    // Lấy danh sách tất cả ví có mã giới thiệu
+    const allWalletsWithReferralCode = await this.walletRepository
+      .createQueryBuilder('wallet')
+      .where('wallet.referral_code IS NOT NULL')
+      .getMany();
+
+    let totalReferrers = 0;
+    let totalReferrals = 0;
+    let topReferrer = null;
+    let maxReferrals = 0;
+
+    // Tính toán cho từng referrer
+    for (const wallet of allWalletsWithReferralCode) {
+      // Đếm số giới thiệu của ví này
+      const referralCount = await this.walletRepository
+        .createQueryBuilder('wallet')
+        .where('wallet.referred_by = :referralCode', { referralCode: wallet.referral_code })
+        .getCount();
+
+      // Chỉ tính những ví đã giới thiệu ít nhất 1 người
+      if (referralCount > 0) {
+        totalReferrers++;
+        totalReferrals += referralCount;
+
+        // Tìm người giới thiệu xuất sắc nhất
+        if (referralCount > maxReferrals) {
+          maxReferrals = referralCount;
+          
+          // Tính thu nhập của top referrer
+          const totalEarningsSOL = await this.referralRewardRepository
+            .createQueryBuilder('reward')
+            .where('reward.referrer_wallet_id = :walletId', { walletId: wallet.id })
+            .andWhere('reward.status = :status', { status: 'paid' })
+            .andWhere('reward.reward_token = :token', { token: 'SOL' })
+            .select('SUM(reward.reward_amount)', 'total')
+            .getRawOne();
+
+          const totalEarningsMMP = await this.referralRewardRepository
+            .createQueryBuilder('reward')
+            .where('reward.referrer_wallet_id = :walletId', { walletId: wallet.id })
+            .andWhere('reward.status = :status', { status: 'paid' })
+            .andWhere('reward.reward_token = :token', { token: 'MMP' })
+            .select('SUM(reward.reward_amount)', 'total')
+            .getRawOne();
+
+          topReferrer = {
+            wallet_id: wallet.id,
+            sol_address: wallet.sol_address,
+            referral_code: wallet.referral_code,
+            total_referrals: referralCount,
+            total_earnings_sol: parseFloat(totalEarningsSOL?.total || '0'),
+            total_earnings_mmp: parseFloat(totalEarningsMMP?.total || '0'),
+          };
+        }
+      }
+    }
+
+    // Tính trung bình
+    const averageReferralsPerReferrer = totalReferrers > 0 ? totalReferrals / totalReferrers : 0;
+
+    return {
+      total_referrers: totalReferrers,
+      average_referrals_per_referrer: Math.round(averageReferralsPerReferrer * 100) / 100, // Làm tròn 2 chữ số thập phân
+      top_referrer: topReferrer,
     };
   }
 }

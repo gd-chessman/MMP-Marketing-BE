@@ -13,4 +13,9 @@ export class ReferralController {
   async getReferralRanking(@Query() searchDto: SearchReferralRankingDto) {
     return this.referralService.getReferralRanking(searchDto);
   }
+
+  @Get('statistics')
+  async getReferralStatistics() {
+    return this.referralService.getReferralStatistics();
+  }
 }
