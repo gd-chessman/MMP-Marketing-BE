@@ -439,10 +439,26 @@ export class UserStakeService {
       throw new BadRequestException("Invalid transaction signature.");
     }
 
-    // Check #3 (Content Verification)
-    if (transaction.instructions.length !== 1 || !transaction.instructions[0].programId.equals(this.programId)) {
-      throw new BadRequestException("Transaction content is invalid.");
+    // Check #3 (Content Verification) - Tìm stake instruction thay vì giả định vị trí
+    const stakeInstruction = transaction.instructions.find(inst => 
+      inst.programId.equals(this.programId)
+    );
+
+    if (!stakeInstruction) {
+      console.error('Transaction instructions:', transaction.instructions.map(inst => ({
+        programId: inst.programId.toBase58(),
+        dataLength: inst.data.length,
+        accountCount: inst.keys.length
+      })));
+      throw new BadRequestException("Transaction content is invalid: no stake instruction found.");
     }
+
+    // Log thông tin instruction để debug
+    console.log('🔧 Found stake instruction:', {
+      programId: stakeInstruction.programId.toBase58(),
+      dataLength: stakeInstruction.data.length,
+      accountCount: stakeInstruction.keys.length
+    });
 
     // 3. Relay the transaction
     try {
@@ -471,7 +487,7 @@ export class UserStakeService {
       const stake_id = Number(currentStakeCounter) - 1;
 
       // Decode instruction data
-      const instructionData = transaction.instructions[0].data.slice(8);
+      const instructionData = stakeInstruction.data.slice(8);
       const decodedInstruction = borsh.deserialize(stakeInstructionSchema, StakeInstruction, instructionData);
       const amount_staked = Number(decodedInstruction.amount) / (10 ** 6);
       const lock_months = decodedInstruction.lock_months;
@@ -603,10 +619,28 @@ export class UserStakeService {
     if (!transaction.verifySignatures()) {
       throw new BadRequestException("Invalid transaction signature.");
     }
-    if (transaction.instructions.length !== 1 || !transaction.instructions[0].programId.equals(this.programId)) {
-        throw new BadRequestException("Transaction content is invalid.");
-    }
     
+    // Check #3 (Content Verification) - Tìm unstake instruction thay vì giả định vị trí
+    const unstakeInstruction = transaction.instructions.find(inst => 
+      inst.programId.equals(this.programId)
+    );
+
+    if (!unstakeInstruction) {
+      console.error('Transaction instructions:', transaction.instructions.map(inst => ({
+        programId: inst.programId.toBase58(),
+        dataLength: inst.data.length,
+        accountCount: inst.keys.length
+      })));
+      throw new BadRequestException("Transaction content is invalid: no unstake instruction found.");
+    }
+
+    // Log thông tin instruction để debug
+    console.log('🔧 Found unstake instruction:', {
+      programId: unstakeInstruction.programId.toBase58(),
+      dataLength: unstakeInstruction.data.length,
+      accountCount: unstakeInstruction.keys.length
+    });
+
     // 3. Relay the transaction
     try {
       const txSignature = await this.connection.sendRawTransaction(transactionBuffer, { skipPreflight: true });
