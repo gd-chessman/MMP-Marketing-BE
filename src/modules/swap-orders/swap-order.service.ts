@@ -105,8 +105,8 @@ export class SwapOrderService {
 
     try {
       // this.logger.debug('Fetching SOL price from Jupiter API...');
-      const response = await axios.get('https://api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112');
-      const price = parseFloat(response.data.data['So11111111111111111111111111111111111111112'].price);
+      const response = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+      const price = parseFloat(response.data.solana.usd);
       
       // Lưu vào cache
       this.solPriceCache = {
