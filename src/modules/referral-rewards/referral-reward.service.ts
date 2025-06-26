@@ -183,7 +183,7 @@ export class ReferralRewardService {
       console.log(`Total MMP received by referrer:`, totalMmpAmount);
 
       // Nếu đạt ngưỡng 5,000 cho MMP, thanh toán tất cả thưởng tích lũy (cả SOL và MMP)
-      if (totalMmpAmount >= 5000) {
+      if (totalMmpAmount >= 50) {
         // Thanh toán MMP rewards
         await this.payAllPendingRewards(walletId, 'MMP');
         // Thanh toán SOL rewards
@@ -260,7 +260,18 @@ export class ReferralRewardService {
         });
 
         for (const reward of pendingRewards) {
-          reward.status = RewardStatus.FAILED;
+          // Nếu là SOL thì kiểm tra nội dung lỗi
+          if (reward.reward_token === 'SOL') {
+            // Chỉ set WAIT_BALANCE nếu lỗi có chứa "insufficient funds for rent"
+            if (error.message && error.message.includes('insufficient funds for rent')) {
+              reward.status = RewardStatus.WAIT_BALANCE;
+            } else {
+              reward.status = RewardStatus.FAILED;
+            }
+          } else {
+            // MMP và các token khác luôn set FAILED
+            reward.status = RewardStatus.FAILED;
+          }
           await this.referralRewardRepository.save(reward);
         }
       } catch (updateError) {

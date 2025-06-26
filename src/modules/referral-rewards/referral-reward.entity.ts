@@ -5,8 +5,10 @@ import { SwapOrder } from '../swap-orders/swap-order.entity';
 export enum RewardStatus {
   PENDING = 'pending',
   PAID = 'paid',
-  FAILED = 'failed'
+  FAILED = 'failed',
+  WAIT_BALANCE = 'wait_balance'
 }
+
 
 @Entity('referral_rewards')
 export class ReferralReward {
