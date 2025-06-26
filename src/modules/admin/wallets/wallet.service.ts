@@ -12,22 +12,42 @@ export class WalletService {
     private walletRepository: Repository<Wallet>,
   ) {}
 
-  async findAll(page = 1, limit = 10, search?: string) {
+  async findAll(page = 1, limit = 10, search?: string, type?: string) {
     const skip = (page - 1) * limit;
     
     let queryBuilder = this.walletRepository
       .createQueryBuilder('wallet')
       .leftJoinAndSelect('wallet.user', 'user');
 
+    // Lọc theo type
+    if (type === 'telegram') {
+      // Ví có telegram_id
+      queryBuilder = queryBuilder
+        .where('wallet.user_id IS NOT NULL')
+        .andWhere('user.telegram_id IS NOT NULL');
+    } else if (type === 'google') {
+      // Ví có email
+      queryBuilder = queryBuilder
+        .where('wallet.user_id IS NOT NULL')
+        .andWhere('user.email IS NOT NULL');
+    } else if (type === 'phantom') {
+      // Phantom (không có user)
+      queryBuilder = queryBuilder.where('wallet.user_id IS NULL');
+    }
+
+    // Lọc theo search
     if (search) {
-      queryBuilder = queryBuilder.where(
-        '(wallet.sol_address ILIKE :search OR ' +
+      const searchCondition = '(wallet.sol_address ILIKE :search OR ' +
         'user.telegram_id ILIKE :search OR ' +
         'user.email ILIKE :search OR ' +
         'wallet.referral_code ILIKE :search OR ' +
-        'CAST(wallet.wallet_type AS TEXT) ILIKE :search)',
-        { search: `%${search}%` }
-      );
+        'CAST(wallet.wallet_type AS TEXT) ILIKE :search)';
+      
+      if (type) {
+        queryBuilder = queryBuilder.andWhere(searchCondition, { search: `%${search}%` });
+      } else {
+        queryBuilder = queryBuilder.where(searchCondition, { search: `%${search}%` });
+      }
     }
 
     const [wallets, total] = await queryBuilder
