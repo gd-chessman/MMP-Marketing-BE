@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Wallet } from '../../wallets/wallet.entity';
 import { WalletStatisticsDto } from './dto/wallet-statistics.dto';
+import { ReferralStatisticsDto } from './dto/referral-statistics.dto';
 
 @Injectable()
 export class WalletService {
@@ -92,6 +93,47 @@ export class WalletService {
     return {
       status: true,
       message: 'Wallet type updated successfully',
+    };
+  }
+
+  async getReferralStatistics(walletId: number): Promise<ReferralStatisticsDto> {
+    // Tìm ví theo ID
+    const wallet = await this.walletRepository.findOne({ 
+      where: { id: walletId },
+      relations: ['user']
+    });
+    
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found');
+    }
+
+    // Tìm tất cả ví được giới thiệu bởi ví này
+    const referredWallets = await this.walletRepository
+      .createQueryBuilder('wallet')
+      .leftJoin('wallet.user', 'user')
+      .select([
+        'wallet.id',
+        'wallet.sol_address',
+        'wallet.created_at',
+        'user.telegram_id',
+        'user.email'
+      ])
+      .where('wallet.referred_by = :referralCode', { referralCode: wallet.referral_code })
+      .orderBy('wallet.created_at', 'DESC')
+      .getMany();
+
+    return {
+      wallet_id: wallet.id,
+      sol_address: wallet.sol_address,
+      referral_code: wallet.referral_code,
+      total_referred_wallets: referredWallets.length,
+      referred_wallets: referredWallets.map(w => ({
+        id: w.id,
+        sol_address: w.sol_address,
+        created_at: w.created_at,
+        user_telegram_id: w.user?.telegram_id,
+        user_email: w.user?.email
+      }))
     };
   }
 }

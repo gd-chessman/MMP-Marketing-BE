@@ -21,7 +21,12 @@ export class WalletController {
     return this.walletService.getStatistics();
   }
 
-  @Patch(':id/update-type')
+  @Get('referral-statistics/:id')
+  async getReferralStatistics(@Param('id') id: string) {
+    return this.walletService.getReferralStatistics(parseInt(id));
+  }
+
+  @Patch('update-type/:id')
   async updateWalletType(@Param('id') id: string, @Body() updateDto: UpdateWalletDto) {
     return this.walletService.updateWalletType(parseInt(id), updateDto.wallet_type);
   }
