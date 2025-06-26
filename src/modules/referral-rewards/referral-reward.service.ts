@@ -183,7 +183,7 @@ export class ReferralRewardService {
       console.log(`Total MMP received by referrer:`, totalMmpAmount);
 
       // Nếu đạt ngưỡng 5,000 cho MMP, thanh toán tất cả thưởng tích lũy (cả SOL và MMP)
-      if (totalMmpAmount >= 50) {
+      if (totalMmpAmount >= 5000) {
         // Thanh toán MMP rewards
         await this.payAllPendingRewards(walletId, 'MMP');
         // Thanh toán SOL rewards
