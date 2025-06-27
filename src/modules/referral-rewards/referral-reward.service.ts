@@ -598,6 +598,7 @@ export class ReferralRewardService {
         'wallet.sol_address as sol_address',
         'wallet.created_at as created_at'
       ])
+      .orderBy('wallet.created_at', 'DESC')
       .getRawMany();
 
     // Tạo danh sách các ví đã được giới thiệu với thông tin reward
