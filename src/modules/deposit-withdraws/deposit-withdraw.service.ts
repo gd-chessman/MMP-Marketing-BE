@@ -14,7 +14,7 @@ import { SwapOrderService } from '../swap-orders/swap-order.service';
 export class DepositWithdrawService {
   private readonly logger = new Logger(DepositWithdrawService.name);
   private readonly connection: Connection;
-  private readonly TRANSACTION_FEE = 0.000005; // Transaction fee in SOL
+  private readonly TRANSACTION_FEE = 0.000015; // Transaction fee in SOL
   private readonly MMP_MINT: string;
   private readonly MPB_MINT: string;
   private readonly USDT_MINT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB';
@@ -246,7 +246,12 @@ export class DepositWithdrawService {
       const totalRequired = Number(transaction.amount) + feeInSol + this.TRANSACTION_FEE;
       
       if (balanceInSol < totalRequired) {
-        throw new BadRequestException(`Insufficient SOL balance. Required: ${totalRequired} SOL (including fee), Available: ${balanceInSol} SOL`);
+        // Điều chỉnh số tiền rút nếu số dư không đủ
+        const adjustedAmount = balanceInSol - feeInSol - this.TRANSACTION_FEE - 0.001;
+        if (adjustedAmount <= 0) {
+          throw new BadRequestException(`Insufficient SOL balance. Required minimum: ${feeInSol + this.TRANSACTION_FEE + 0.001} SOL (fee only), Available: ${balanceInSol} SOL`);
+        }
+        transaction.amount = adjustedAmount;
       }
 
       // Tạo transaction với 2 instruction:
@@ -286,6 +291,7 @@ export class DepositWithdrawService {
       transaction.status = WithdrawalStatus.FAILED;
       transaction.tx_hash = null;
       await this.depositWithdrawRepository.save(transaction);
+      this.logger.error(`Error processing withdrawal: ${error.message}`);
       const errorMessage = error.message || '';
       if (errorMessage.includes('Simulation failed')) {
         if (errorMessage.includes('insufficient lamports')) {
