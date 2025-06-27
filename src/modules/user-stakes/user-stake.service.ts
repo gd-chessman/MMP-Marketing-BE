@@ -190,7 +190,7 @@ export class UserStakeService {
 
       const startDate = new Date();
       const endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + lock_months);
+      endDate.setDate(endDate.getDate() + (lock_months * 30));
 
       const newUserStake = this.userStakeRepository.create({
         wallet_id: walletId,
@@ -501,8 +501,9 @@ export class UserStakeService {
           this.programId
       );
 
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + lock_months);
+      const startDate = new Date();
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + (lock_months * 30));
 
       const newUserStake = this.userStakeRepository.create({
           wallet_id: wallet.id,
@@ -511,7 +512,7 @@ export class UserStakeService {
           stake_account_pda: userStakePDA.toBase58(),
           staking_tx_signature: txSignature,
           amount_staked,
-          start_date: new Date(),
+          start_date: startDate,
           end_date: endDate,
           status: UserStakeStatus.ACTIVE,
       });
