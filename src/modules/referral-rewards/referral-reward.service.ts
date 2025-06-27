@@ -470,6 +470,100 @@ export class ReferralRewardService {
     };
   }
 
+  async findByWalletAddress(walletAddress: string, page: number = 1, limit: number = 50): Promise<{ data: ReferralReward[]; total: number; page: number; limit: number }> {
+    const skip = (page - 1) * limit;
+    
+    // Tìm wallet ID từ địa chỉ ví
+    const wallet = await this.walletRepository.findOne({
+      where: { sol_address: walletAddress },
+      select: ['id']
+    });
+
+    if (!wallet) {
+      return {
+        data: [],
+        total: 0,
+        page,
+        limit
+      };
+    }
+
+    const [data, total] = await this.referralRewardRepository.findAndCount({
+      where: { referrer_wallet_id: wallet.id, status: RewardStatus.PAID },
+      relations: ['referred_wallet'],
+      select: {
+        id: true,
+        reward_amount: true,
+        reward_token: true,
+        status: true,
+        tx_hash: true,
+        created_at: true,
+        referred_wallet: {
+          sol_address: true
+        }
+      },
+      order: { created_at: 'DESC' },
+      skip,
+      take: limit
+    });
+
+    return {
+      data,
+      total,
+      page,
+      limit
+    };
+  }
+
+  async findByReferrerAndReferredAddress(referrerWalletId: number, referredWalletAddress: string, page: number = 1, limit: number = 50): Promise<{ data: ReferralReward[]; total: number; page: number; limit: number }> {
+    const skip = (page - 1) * limit;
+    
+    // Tìm wallet ID của người được giới thiệu từ địa chỉ ví
+    const referredWallet = await this.walletRepository.findOne({
+      where: { sol_address: referredWalletAddress },
+      select: ['id']
+    });
+
+    if (!referredWallet) {
+      return {
+        data: [],
+        total: 0,
+        page,
+        limit
+      };
+    }
+
+    const [data, total] = await this.referralRewardRepository.findAndCount({
+      where: { 
+        referrer_wallet_id: referrerWalletId, 
+        referred_wallet_id: referredWallet.id,
+        status: RewardStatus.PAID 
+      },
+      relations: ['referred_wallet'],
+      select: {
+        id: true,
+        reward_amount: true,
+        reward_token: true,
+        status: true,
+        tx_hash: true,
+        created_at: true,
+        referred_wallet: {
+          sol_address: true
+        }
+      },
+      order: { created_at: 'DESC' },
+      skip,
+      take: limit
+    });
+
+    return {
+      data,
+      total,
+      page,
+      limit
+    };
+  }
+
   // Lấy thống kê referral rewards của một wallet
   async getReferralStatistics(walletId: number): Promise<ReferralStatisticsDto> {
     // Lấy thông tin ví của người giới thiệu để lấy referral_code
