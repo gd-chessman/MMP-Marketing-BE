@@ -20,6 +20,7 @@ export class DepositWithdrawService {
   private readonly USDT_MINT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB';
   private readonly USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
   private readonly WITHDRAWAL_FEE_USD = 0.1; // $1
+  private readonly MIN_AMOUNT_USD = 0.1; // $0.1
   private readonly DESTINATION_WALLET: string; // Ví sàn để nhận phí
 
   constructor(
@@ -63,6 +64,25 @@ export class DepositWithdrawService {
       } catch (error) {
         this.logger.error(`Error creating deposit/withdraw 1: ${error.message}`);
         throw new BadRequestException('Invalid Solana wallet address');
+      }
+
+      // Kiểm tra số tiền tối thiểu cho withdrawal
+      if (dto.type === TransactionType.WITHDRAW) {
+        switch (dto.symbol) {
+          case 'SOL':
+            const solPriceUSD = await this.swapOrderService.getSolPriceUSD();
+            const solAmountUSD = Number(dto.amount) * solPriceUSD;
+            if (solAmountUSD < this.MIN_AMOUNT_USD) {
+              throw new BadRequestException(`Minimum withdrawal amount for SOL is $${this.MIN_AMOUNT_USD}`);
+            }
+            break;
+          case 'USDT':
+          case 'USDC':
+            if (Number(dto.amount) < this.MIN_AMOUNT_USD) {
+              throw new BadRequestException(`Minimum withdrawal amount for ${dto.symbol} is $${this.MIN_AMOUNT_USD}`);
+            }
+            break;
+        }
       }
 
       // Tạo bản ghi giao dịch
