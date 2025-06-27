@@ -8,6 +8,7 @@ import { UserAdminModule } from './user-admins/user-admin.module';
 import { WalletModule } from './wallets/wallet.module';
 import { TokenSaleRoundModule } from './token-sale-rounds/token-sale-round.module';
 import { ReferralModule } from './referral/referral.module';
+import { StakeModule } from './stakes/stake.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ReferralModule } from './referral/referral.module';
     WalletModule,
     TokenSaleRoundModule,
     ReferralModule,
+    StakeModule,
   ],
   providers: [AdminService],
   controllers: [AdminController],
