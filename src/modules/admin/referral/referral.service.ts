@@ -120,7 +120,8 @@ export class ReferralService {
     let filteredData = allRankingData;
     if (search) {
       filteredData = allRankingData.filter(item => 
-        item.sol_address.toLowerCase().includes(search.toLowerCase())
+        item.sol_address.toLowerCase().includes(search.toLowerCase()) ||
+        item.referral_code.toLowerCase().includes(search.toLowerCase())
       );
     }
 
