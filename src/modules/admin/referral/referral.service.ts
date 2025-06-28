@@ -3,9 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Wallet } from '../../wallets/wallet.entity';
 import { ReferralReward } from '../../referral-rewards/referral-reward.entity';
+import { ReferralClick } from '../../referral-clicks/referral-click.entity';
 import { ReferralRankingDto, ReferralRankingResponseDto } from './dto/referral-ranking.dto';
 import { SearchReferralRankingDto, RankingPeriod } from './dto/search-referral-ranking.dto';
 import { ReferralStatisticsDto } from './dto/referral-statistics.dto';
+import { ClickStatisticsDto } from './dto/click-statistics.dto';
 
 @Injectable()
 export class ReferralService {
@@ -14,6 +16,8 @@ export class ReferralService {
     private walletRepository: Repository<Wallet>,
     @InjectRepository(ReferralReward)
     private referralRewardRepository: Repository<ReferralReward>,
+    @InjectRepository(ReferralClick)
+    private referralClickRepository: Repository<ReferralClick>,
   ) {}
 
   async getReferralRanking(searchDto: SearchReferralRankingDto): Promise<ReferralRankingResponseDto> {
@@ -200,6 +204,75 @@ export class ReferralService {
       total_referrers: totalReferrers,
       average_referrals_per_referrer: Math.round(averageReferralsPerReferrer * 100) / 100, // Làm tròn 2 chữ số thập phân
       top_referrer: topReferrer,
+    };
+  }
+
+  async getClickStatistics(): Promise<ClickStatisticsDto> {
+    // Lấy tổng số ví có click
+    const totalWalletsWithClicks = await this.referralClickRepository.count();
+
+    // Lấy tổng số click của tất cả ví
+    const totalClicksResult = await this.referralClickRepository
+      .createQueryBuilder('click')
+      .select('SUM(click.total_clicks)', 'total')
+      .getRawOne();
+    const totalClicksAllWallets = parseInt(totalClicksResult?.total || '0');
+
+    // Lấy tổng click hôm nay
+    const clicksTodayResult = await this.referralClickRepository
+      .createQueryBuilder('click')
+      .select('SUM(click.clicks_today)', 'total')
+      .getRawOne();
+    const clicksTodayAllWallets = parseInt(clicksTodayResult?.total || '0');
+
+    // Lấy tổng click tuần này
+    const clicksThisWeekResult = await this.referralClickRepository
+      .createQueryBuilder('click')
+      .select('SUM(click.clicks_this_week)', 'total')
+      .getRawOne();
+    const clicksThisWeekAllWallets = parseInt(clicksThisWeekResult?.total || '0');
+
+    // Lấy tổng click tháng này
+    const clicksThisMonthResult = await this.referralClickRepository
+      .createQueryBuilder('click')
+      .select('SUM(click.clicks_this_month)', 'total')
+      .getRawOne();
+    const clicksThisMonthAllWallets = parseInt(clicksThisMonthResult?.total || '0');
+
+    // Tính trung bình click per wallet
+    const averageClicksPerWallet = totalWalletsWithClicks > 0 
+      ? Math.round((totalClicksAllWallets / totalWalletsWithClicks) * 100) / 100 
+      : 0;
+
+    // Tìm ví có nhiều click nhất
+    const topWalletResult = await this.referralClickRepository
+      .createQueryBuilder('click')
+      .leftJoin('click.wallet', 'wallet')
+      .select([
+        'wallet.id as wallet_id',
+        'wallet.sol_address as sol_address',
+        'wallet.referral_code as referral_code',
+        'click.total_clicks as total_clicks'
+      ])
+      .orderBy('click.total_clicks', 'DESC')
+      .limit(1)
+      .getRawOne();
+
+    const topWallet = topWalletResult ? {
+      wallet_id: topWalletResult.wallet_id,
+      sol_address: topWalletResult.sol_address,
+      referral_code: topWalletResult.referral_code,
+      total_clicks: parseInt(topWalletResult.total_clicks)
+    } : null;
+
+    return {
+      total_wallets_with_clicks: totalWalletsWithClicks,
+      total_clicks_all_wallets: totalClicksAllWallets,
+      average_clicks_per_wallet: averageClicksPerWallet,
+      top_wallet: topWallet,
+      clicks_today_all_wallets: clicksTodayAllWallets,
+      clicks_this_week_all_wallets: clicksThisWeekAllWallets,
+      clicks_this_month_all_wallets: clicksThisMonthAllWallets
     };
   }
 }

@@ -2,6 +2,7 @@ import { Controller, Get, Query, UseGuards, UseInterceptors, ClassSerializerInte
 import { JwtAdminGuard } from '../auth/jwt-admin.guard';
 import { ReferralService } from './referral.service';
 import { SearchReferralRankingDto } from './dto/search-referral-ranking.dto';
+import { ClickStatisticsDto } from './dto/click-statistics.dto';
 
 @Controller('admin/referral')
 @UseGuards(JwtAdminGuard)
@@ -14,8 +15,13 @@ export class ReferralController {
     return this.referralService.getReferralRanking(searchDto);
   }
 
-  @Get('statistics')
+  @Get('statistics/performance')
   async getReferralStatistics() {
     return this.referralService.getReferralStatistics();
+  }
+
+  @Get('statistics/clicks')
+  async getClickStatistics(): Promise<ClickStatisticsDto> {
+    return this.referralService.getClickStatistics();
   }
 }

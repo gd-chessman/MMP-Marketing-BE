@@ -18,6 +18,7 @@ import { DepositWithdrawModule } from './modules/deposit-withdraws/deposit-withd
 import { AdminModule } from './modules/admin/admin.module';
 import { WebsocketModule } from './modules/websocket/websocket.module';
 import { TokenSaleRoundModule } from './modules/token-sale-rounds/token-sale-round.module';
+import { ReferralClickModule } from './modules/referral-clicks/referral-click.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { TokenSaleRoundModule } from './modules/token-sale-rounds/token-sale-rou
     AdminModule,
     WebsocketModule,
     TokenSaleRoundModule,
+    ReferralClickModule,
   ],
   controllers: [AppController], // Các controller của ứng dụng
   providers: [AppService]
