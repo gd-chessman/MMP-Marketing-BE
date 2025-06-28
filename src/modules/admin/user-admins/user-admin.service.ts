@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { UserAdmin, UserAdminRole } from './user-admin.entity';
@@ -6,6 +6,7 @@ import { CreateUserAdminDto } from './dto/create-user-admin.dto';
 import { SearchUserAdminsDto } from './dto/search-user-admins.dto';
 import { DeleteUserAdminDto } from './dto/delete-user-admin.dto';
 import { UserAdminStatisticsDto } from './dto/user-admin-statistics.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -123,6 +124,45 @@ export class UserAdminService {
       total_users: totalUsers,
       admin_users: adminUsers,
       member_users: memberUsers
+    };
+  }
+
+  async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {
+    // Tìm user admin
+    const userAdmin = await this.findById(userId);
+    if (!userAdmin) {
+      throw new NotFoundException('User admin not found');
+    }
+
+    // Kiểm tra mật khẩu cũ
+    const isOldPasswordValid = await bcrypt.compare(
+      changePasswordDto.old_password,
+      userAdmin.password
+    );
+
+    if (!isOldPasswordValid) {
+      throw new BadRequestException('Old password is incorrect');
+    }
+
+    // Kiểm tra mật khẩu mới không được trùng với mật khẩu cũ
+    const isNewPasswordSameAsOld = await bcrypt.compare(
+      changePasswordDto.new_password,
+      userAdmin.password
+    );
+
+    if (isNewPasswordSameAsOld) {
+      throw new BadRequestException('New password must be different from old password');
+    }
+
+    // Hash mật khẩu mới
+    const hashedNewPassword = await bcrypt.hash(changePasswordDto.new_password, 10);
+
+    // Cập nhật mật khẩu
+    userAdmin.password = hashedNewPassword;
+    await this.userAdminRepository.save(userAdmin);
+
+    return {
+      message: 'Password changed successfully'
     };
   }
 }
