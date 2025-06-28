@@ -4,6 +4,7 @@ import { UserAdminService } from './user-admin.service';
 import { CreateUserAdminDto } from './dto/create-user-admin.dto';
 import { SearchUserAdminsDto } from './dto/search-user-admins.dto';
 import { DeleteUserAdminDto } from './dto/delete-user-admin.dto';
+import { UserAdminStatisticsDto } from './dto/user-admin-statistics.dto';
 
 @Controller('admin/user-admins')
 @UseGuards(JwtAdminGuard)
@@ -19,6 +20,11 @@ export class UserAdminController {
   @Get()
   async findAll(@Query() searchDto: SearchUserAdminsDto) {
     return this.userAdminService.findAll(searchDto);
+  }
+
+  @Get('statistics')
+  async getStatistics(): Promise<UserAdminStatisticsDto> {
+    return this.userAdminService.getStatistics();
   }
 
   @Post()

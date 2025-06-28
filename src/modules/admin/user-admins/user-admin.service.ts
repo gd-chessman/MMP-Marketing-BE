@@ -5,6 +5,7 @@ import { UserAdmin, UserAdminRole } from './user-admin.entity';
 import { CreateUserAdminDto } from './dto/create-user-admin.dto';
 import { SearchUserAdminsDto } from './dto/search-user-admins.dto';
 import { DeleteUserAdminDto } from './dto/delete-user-admin.dto';
+import { UserAdminStatisticsDto } from './dto/user-admin-statistics.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -101,6 +102,27 @@ export class UserAdminService {
 
     return {
       message: 'User admin deleted successfully',
+    };
+  }
+
+  async getStatistics(): Promise<UserAdminStatisticsDto> {
+    // Tổng số user admin trong hệ thống
+    const totalUsers = await this.userAdminRepository.count();
+
+    // Số user admin có role ADMIN
+    const adminUsers = await this.userAdminRepository.count({
+      where: { role: UserAdminRole.ADMIN }
+    });
+
+    // Số user admin có role MEMBER
+    const memberUsers = await this.userAdminRepository.count({
+      where: { role: UserAdminRole.MEMBER }
+    });
+
+    return {
+      total_users: totalUsers,
+      admin_users: adminUsers,
+      member_users: memberUsers
     };
   }
 }
