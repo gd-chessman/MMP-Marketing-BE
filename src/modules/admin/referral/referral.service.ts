@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Wallet } from '../../wallets/wallet.entity';
@@ -8,6 +8,7 @@ import { ReferralRankingDto, ReferralRankingResponseDto } from './dto/referral-r
 import { SearchReferralRankingDto, RankingPeriod } from './dto/search-referral-ranking.dto';
 import { ReferralStatisticsDto } from './dto/referral-statistics.dto';
 import { ClickStatisticsDto } from './dto/click-statistics.dto';
+import { WalletClickStatisticsDto } from './dto/wallet-click-statistics.dto';
 
 @Injectable()
 export class ReferralService {
@@ -273,6 +274,51 @@ export class ReferralService {
       clicks_today_all_wallets: clicksTodayAllWallets,
       clicks_this_week_all_wallets: clicksThisWeekAllWallets,
       clicks_this_month_all_wallets: clicksThisMonthAllWallets
+    };
+  }
+
+  async getWalletClickStatistics(walletId: number): Promise<WalletClickStatisticsDto> {
+    // Tìm wallet
+    const wallet = await this.walletRepository.findOne({
+      where: { id: walletId }
+    });
+
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found');
+    }
+
+    // Tìm click stats của wallet
+    const clickStats = await this.referralClickRepository.findOne({
+      where: { wallet_id: walletId }
+    });
+
+    if (!clickStats) {
+      // Trả về stats mặc định nếu chưa có
+      return {
+        wallet_id: wallet.id,
+        sol_address: wallet.sol_address,
+        referral_code: wallet.referral_code,
+        total_clicks: 0,
+        clicks_today: 0,
+        clicks_this_week: 0,
+        clicks_this_month: 0,
+        last_click_at: null,
+        created_at: null,
+        updated_at: null
+      };
+    }
+
+    return {
+      wallet_id: wallet.id,
+      sol_address: wallet.sol_address,
+      referral_code: wallet.referral_code,
+      total_clicks: clickStats.total_clicks,
+      clicks_today: clickStats.clicks_today,
+      clicks_this_week: clickStats.clicks_this_week,
+      clicks_this_month: clickStats.clicks_this_month,
+      last_click_at: clickStats.last_click_at,
+      created_at: clickStats.created_at,
+      updated_at: clickStats.updated_at
     };
   }
 }
