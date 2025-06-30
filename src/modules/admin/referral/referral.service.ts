@@ -220,23 +220,33 @@ export class ReferralService {
       .getRawOne();
     const totalClicksAllWallets = parseInt(totalClicksResult?.total || '0');
 
-    // Lấy tổng click hôm nay
+    // Tính toán thời gian
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay()); // Chủ nhật là ngày đầu tuần
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Tính click hôm nay (real-time) - đếm tổng số click từ các wallet có click hôm nay
     const clicksTodayResult = await this.referralClickRepository
       .createQueryBuilder('click')
+      .where('click.last_click_at >= :today', { today })
       .select('SUM(click.clicks_today)', 'total')
       .getRawOne();
     const clicksTodayAllWallets = parseInt(clicksTodayResult?.total || '0');
 
-    // Lấy tổng click tuần này
+    // Tính click tuần này (real-time) - đếm tổng số click từ các wallet có click tuần này
     const clicksThisWeekResult = await this.referralClickRepository
       .createQueryBuilder('click')
+      .where('click.last_click_at >= :startOfWeek', { startOfWeek })
       .select('SUM(click.clicks_this_week)', 'total')
       .getRawOne();
     const clicksThisWeekAllWallets = parseInt(clicksThisWeekResult?.total || '0');
 
-    // Lấy tổng click tháng này
+    // Tính click tháng này (real-time) - đếm tổng số click từ các wallet có click tháng này
     const clicksThisMonthResult = await this.referralClickRepository
       .createQueryBuilder('click')
+      .where('click.last_click_at >= :startOfMonth', { startOfMonth })
       .select('SUM(click.clicks_this_month)', 'total')
       .getRawOne();
     const clicksThisMonthAllWallets = parseInt(clicksThisMonthResult?.total || '0');
@@ -309,14 +319,45 @@ export class ReferralService {
       };
     }
 
+    // Tính toán thời gian real-time
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay()); // Chủ nhật là ngày đầu tuần
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Tính click real-time dựa trên last_click_at
+    let clicksToday = 0;
+    let clicksThisWeek = 0;
+    let clicksThisMonth = 0;
+
+    if (clickStats.last_click_at) {
+      const lastClickDate = new Date(clickStats.last_click_at);
+      
+      // Kiểm tra click hôm nay
+      if (lastClickDate >= today) {
+        clicksToday = clickStats.clicks_today;
+      }
+      
+      // Kiểm tra click tuần này
+      if (lastClickDate >= startOfWeek) {
+        clicksThisWeek = clickStats.clicks_this_week;
+      }
+      
+      // Kiểm tra click tháng này
+      if (lastClickDate >= startOfMonth) {
+        clicksThisMonth = clickStats.clicks_this_month;
+      }
+    }
+
     return {
       wallet_id: wallet.id,
       sol_address: wallet.sol_address,
       referral_code: wallet.referral_code,
       total_clicks: clickStats.total_clicks,
-      clicks_today: clickStats.clicks_today,
-      clicks_this_week: clickStats.clicks_this_week,
-      clicks_this_month: clickStats.clicks_this_month,
+      clicks_today: clicksToday,
+      clicks_this_week: clicksThisWeek,
+      clicks_this_month: clicksThisMonth,
       last_click_at: clickStats.last_click_at,
       created_at: clickStats.created_at,
       updated_at: clickStats.updated_at
