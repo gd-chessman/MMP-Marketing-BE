@@ -19,8 +19,8 @@ export class DepositWithdrawService {
   private readonly MPB_MINT: string;
   private readonly USDT_MINT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB';
   private readonly USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-  private readonly WITHDRAWAL_FEE_USD = 0.1; // $1
-  private readonly MIN_AMOUNT_USD = 0.1; // $0.1
+  private readonly WITHDRAWAL_FEE_USD = 1; // $1
+  private readonly MIN_AMOUNT_USD = 10; // $0.1
   private readonly DESTINATION_WALLET: string; // Ví sàn để nhận phí
 
   constructor(
