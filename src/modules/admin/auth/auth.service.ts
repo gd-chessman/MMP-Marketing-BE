@@ -20,11 +20,11 @@ export class AuthService implements OnModuleInit {
 
   private async createDefaultAdmin() {
     try {
-      const adminExists = await this.userAdminRepository.findOne({
-        where: { email: 'admin@example.com' },
-      });
+      // Kiểm tra xem có admin nào trong database không
+      const adminCount = await this.userAdminRepository.count();
 
-      if (!adminExists) {
+      if (adminCount === 0) {
+        // Chỉ tạo admin mặc định khi không có admin nào trong database
         const hashedPassword = await bcrypt.hash('admin123', 10);
         await this.userAdminRepository.save({
           email: 'admin@example.com',
