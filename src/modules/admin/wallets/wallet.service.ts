@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Wallet } from '../../wallets/wallet.entity';
 import { WalletStatisticsDto } from './dto/wallet-statistics.dto';
 import { ReferralStatisticsDto } from './dto/referral-statistics.dto';
+import { WalletTypeFilter } from './dto/search-wallets.dto';
 
 @Injectable()
 export class WalletService {
@@ -12,7 +13,7 @@ export class WalletService {
     private walletRepository: Repository<Wallet>,
   ) {}
 
-  async findAll(page = 1, limit = 10, search?: string, type?: string) {
+  async findAll(page = 1, limit = 10, search?: string, type?: string, wallet_type: WalletTypeFilter = WalletTypeFilter.ALL) {
     const skip = (page - 1) * limit;
     
     let queryBuilder = this.walletRepository
@@ -35,6 +36,19 @@ export class WalletService {
       queryBuilder = queryBuilder.where('wallet.user_id IS NULL');
     }
 
+    // Lọc theo wallet_type
+    if (wallet_type !== WalletTypeFilter.ALL) {
+      if (type) {
+        queryBuilder = queryBuilder.andWhere('wallet.wallet_type = :walletType', { 
+          walletType: wallet_type 
+        });
+      } else {
+        queryBuilder = queryBuilder.where('wallet.wallet_type = :walletType', { 
+          walletType: wallet_type 
+        });
+      }
+    }
+
     // Lọc theo search
     if (search) {
       const searchCondition = '(wallet.sol_address ILIKE :search OR ' +
@@ -43,7 +57,7 @@ export class WalletService {
         'wallet.referral_code ILIKE :search OR ' +
         'CAST(wallet.wallet_type AS TEXT) ILIKE :search)';
       
-      if (type) {
+      if (type || wallet_type !== WalletTypeFilter.ALL) {
         queryBuilder = queryBuilder.andWhere(searchCondition, { search: `%${search}%` });
       } else {
         queryBuilder = queryBuilder.where(searchCondition, { search: `%${search}%` });

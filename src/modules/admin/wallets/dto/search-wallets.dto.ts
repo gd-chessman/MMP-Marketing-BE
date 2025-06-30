@@ -7,6 +7,12 @@ export enum WalletType {
   PHANTOM = 'phantom'    // Không có user
 }
 
+export enum WalletTypeFilter {
+  ALL = 'all',
+  NORMAL = 'normal',
+  BJ = 'bj'
+}
+
 export class SearchWalletsDto {
   @IsOptional()
   @IsString()
@@ -15,6 +21,10 @@ export class SearchWalletsDto {
   @IsOptional()
   @IsEnum(WalletType)
   type?: WalletType;
+
+  @IsOptional()
+  @IsEnum(WalletTypeFilter)
+  wallet_type?: WalletTypeFilter = WalletTypeFilter.ALL;
 
   @IsOptional()
   @Type(() => Number)

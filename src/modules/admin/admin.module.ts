@@ -9,6 +9,7 @@ import { WalletModule } from './wallets/wallet.module';
 import { TokenSaleRoundModule } from './token-sale-rounds/token-sale-round.module';
 import { ReferralModule } from './referral/referral.module';
 import { StakeModule } from './stakes/stake.module';
+import { SwapOrderModule } from './swap-orders/swap-order.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { StakeModule } from './stakes/stake.module';
     TokenSaleRoundModule,
     ReferralModule,
     StakeModule,
+    SwapOrderModule,
   ],
   providers: [AdminService],
   controllers: [AdminController],
