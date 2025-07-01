@@ -584,6 +584,10 @@ export class ReferralRewardService {
         total_reward_sol: 0,
         total_reward_mmp: 0,
         total_reward_mpb: 0, // Giữ lại để tương thích với DTO
+        total_pending_reward_sol: 0,
+        total_pending_reward_mmp: 0,
+        total_wait_balance_reward_sol: 0,
+        total_wait_balance_reward_mmp: 0,
         referred_wallets: []
       };
     }
@@ -625,12 +629,42 @@ export class ReferralRewardService {
         .groupBy('reward.reward_token')
         .getRawMany();
 
+      // Lấy tổng reward pending theo từng loại token
+      const pendingRewardStats = await this.referralRewardRepository
+        .createQueryBuilder('reward')
+        .where('reward.referrer_wallet_id = :walletId', { walletId })
+        .andWhere('reward.referred_wallet_id = :referredWalletId', { referredWalletId })
+        .andWhere('reward.status = :status', { status: RewardStatus.PENDING })
+        .select([
+          'reward.reward_token as token',
+          'SUM(reward.reward_amount) as total_amount'
+        ])
+        .groupBy('reward.reward_token')
+        .getRawMany();
+
+      // Lấy tổng reward wait_balance theo từng loại token
+      const waitBalanceRewardStats = await this.referralRewardRepository
+        .createQueryBuilder('reward')
+        .where('reward.referrer_wallet_id = :walletId', { walletId })
+        .andWhere('reward.referred_wallet_id = :referredWalletId', { referredWalletId })
+        .andWhere('reward.status = :status', { status: RewardStatus.WAIT_BALANCE })
+        .select([
+          'reward.reward_token as token',
+          'SUM(reward.reward_amount) as total_amount'
+        ])
+        .groupBy('reward.reward_token')
+        .getRawMany();
+
       // Khởi tạo giá trị mặc định
       let totalRewardSol = 0;
       let totalRewardMmp = 0;
       let totalRewardMpb = 0; // Giữ lại để tương thích với DTO
+      let pendingRewardSol = 0;
+      let pendingRewardMmp = 0;
+      let waitBalanceRewardSol = 0;
+      let waitBalanceRewardMmp = 0;
 
-      // Phân loại theo token type (chỉ SOL và MMP, không còn MPB)
+      // Phân loại theo token type cho reward đã thanh toán
       rewardStats.forEach(stat => {
         const amount = parseFloat(stat.total_amount);
         switch (stat.token) {
@@ -644,13 +678,43 @@ export class ReferralRewardService {
         }
       });
 
+      // Phân loại theo token type cho reward pending
+      pendingRewardStats.forEach(stat => {
+        const amount = parseFloat(stat.total_amount);
+        switch (stat.token) {
+          case 'SOL':
+            pendingRewardSol = amount;
+            break;
+          case 'MMP':
+            pendingRewardMmp = amount;
+            break;
+        }
+      });
+
+      // Phân loại theo token type cho reward wait_balance
+      waitBalanceRewardStats.forEach(stat => {
+        const amount = parseFloat(stat.total_amount);
+        switch (stat.token) {
+          case 'SOL':
+            waitBalanceRewardSol = amount;
+            break;
+          case 'MMP':
+            waitBalanceRewardMmp = amount;
+            break;
+        }
+      });
+
       referredWallets.push({
         wallet_id: walletData.wallet_id,
         sol_address: walletData.sol_address,
         created_at: new Date(walletData.created_at),
         total_reward_sol: totalRewardSol,
         total_reward_mmp: totalRewardMmp,
-        total_reward_mpb: totalRewardMpb // Luôn là 0
+        total_reward_mpb: totalRewardMpb, // Luôn là 0
+        pending_reward_sol: pendingRewardSol,
+        pending_reward_mmp: pendingRewardMmp,
+        wait_balance_reward_sol: waitBalanceRewardSol,
+        wait_balance_reward_mmp: waitBalanceRewardMmp
       });
     }
 
@@ -659,13 +723,21 @@ export class ReferralRewardService {
       total_reward_sol: 0,
       total_reward_mmp: 0,
       total_reward_mpb: 0, // Luôn là 0 vì không còn thưởng MPB
+      total_pending_reward_sol: 0,
+      total_pending_reward_mmp: 0,
+      total_wait_balance_reward_sol: 0,
+      total_wait_balance_reward_mmp: 0,
       referred_wallets: referredWallets
     };
 
-    // Phân loại theo token type
+    // Tính tổng tất cả các loại reward
     referredWallets.forEach(wallet => {
       statistics.total_reward_sol += wallet.total_reward_sol;
       statistics.total_reward_mmp += wallet.total_reward_mmp;
+      statistics.total_pending_reward_sol += wallet.pending_reward_sol;
+      statistics.total_pending_reward_mmp += wallet.pending_reward_mmp;
+      statistics.total_wait_balance_reward_sol += wallet.wait_balance_reward_sol;
+      statistics.total_wait_balance_reward_mmp += wallet.wait_balance_reward_mmp;
       // total_reward_mpb luôn là 0
     });
 
