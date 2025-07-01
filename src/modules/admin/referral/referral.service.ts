@@ -68,11 +68,11 @@ export class ReferralService {
         .andWhere('wallet.created_at >= :startOfWeek', { startOfWeek })
         .getCount();
 
-      // Tính tổng thu nhập từ giới thiệu theo SOL và MMP
+      // Tính tổng thu nhập từ giới thiệu theo SOL và MMP (bao gồm paid, pending, wait_balance)
       const totalEarningsSOL = await this.referralRewardRepository
         .createQueryBuilder('reward')
         .where('reward.referrer_wallet_id = :walletId', { walletId: wallet.id })
-        .andWhere('reward.status = :status', { status: 'paid' })
+        .andWhere('reward.status IN (:...statuses)', { statuses: ['paid', 'pending', 'wait_balance'] })
         .andWhere('reward.reward_token = :token', { token: 'SOL' })
         .select('SUM(reward.reward_amount)', 'total')
         .getRawOne();
@@ -80,7 +80,7 @@ export class ReferralService {
       const totalEarningsMMP = await this.referralRewardRepository
         .createQueryBuilder('reward')
         .where('reward.referrer_wallet_id = :walletId', { walletId: wallet.id })
-        .andWhere('reward.status = :status', { status: 'paid' })
+        .andWhere('reward.status IN (:...statuses)', { statuses: ['paid', 'pending', 'wait_balance'] })
         .andWhere('reward.reward_token = :token', { token: 'MMP' })
         .select('SUM(reward.reward_amount)', 'total')
         .getRawOne();
