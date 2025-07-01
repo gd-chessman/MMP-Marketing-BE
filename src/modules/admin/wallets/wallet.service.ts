@@ -141,6 +141,33 @@ export class WalletService {
       throw new NotFoundException('Wallet not found');
     }
 
+    // Tìm thông tin người giới thiệu (nếu có)
+    let referredByInfo = null;
+    if (wallet.referred_by) {
+      const referrerWallet = await this.walletRepository
+        .createQueryBuilder('wallet')
+        .leftJoin('wallet.user', 'user')
+        .select([
+          'wallet.id',
+          'wallet.sol_address',
+          'wallet.referral_code',
+          'user.telegram_id',
+          'user.email'
+        ])
+        .where('wallet.referral_code = :referralCode', { referralCode: wallet.referred_by })
+        .getOne();
+
+      if (referrerWallet) {
+        referredByInfo = {
+          wallet_id: referrerWallet.id,
+          sol_address: referrerWallet.sol_address,
+          referral_code: referrerWallet.referral_code,
+          user_telegram_id: referrerWallet.user?.telegram_id,
+          user_email: referrerWallet.user?.email
+        };
+      }
+    }
+
     // Tìm tất cả ví được giới thiệu bởi ví này
     const referredWallets = await this.walletRepository
       .createQueryBuilder('wallet')
@@ -161,6 +188,7 @@ export class WalletService {
       sol_address: wallet.sol_address,
       referral_code: wallet.referral_code,
       total_referred_wallets: referredWallets.length,
+      referred_by_info: referredByInfo,
       referred_wallets: referredWallets.map(w => ({
         id: w.id,
         sol_address: w.sol_address,
