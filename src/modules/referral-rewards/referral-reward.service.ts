@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository, SelectQueryBuilder, In } from 'typeorm';
 import { ReferralReward, RewardStatus } from './referral-reward.entity';
 import { Wallet } from '../wallets/wallet.entity';
 import { SwapOrder } from '../swap-orders/swap-order.entity';
@@ -444,7 +444,10 @@ export class ReferralRewardService {
     const skip = (page - 1) * limit;
     
     const [data, total] = await this.referralRewardRepository.findAndCount({
-      where: { referrer_wallet_id: walletId, status: RewardStatus.PAID },
+      where: { 
+        referrer_wallet_id: walletId, 
+        status: In([RewardStatus.PAID, RewardStatus.PENDING, RewardStatus.WAIT_BALANCE])
+      },
       relations: ['referred_wallet'],
       select: {
         id: true,
@@ -489,7 +492,10 @@ export class ReferralRewardService {
     }
 
     const [data, total] = await this.referralRewardRepository.findAndCount({
-      where: { referrer_wallet_id: wallet.id, status: RewardStatus.PAID },
+      where: { 
+        referrer_wallet_id: wallet.id, 
+        status: In([RewardStatus.PAID, RewardStatus.PENDING, RewardStatus.WAIT_BALANCE])
+      },
       relations: ['referred_wallet'],
       select: {
         id: true,
@@ -537,7 +543,7 @@ export class ReferralRewardService {
       where: { 
         referrer_wallet_id: referrerWalletId, 
         referred_wallet_id: referredWallet.id,
-        status: RewardStatus.PAID 
+        status: In([RewardStatus.PAID, RewardStatus.PENDING, RewardStatus.WAIT_BALANCE])
       },
       relations: ['referred_wallet'],
       select: {
