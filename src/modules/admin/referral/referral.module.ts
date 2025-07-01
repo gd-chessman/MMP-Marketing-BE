@@ -5,10 +5,11 @@ import { ReferralService } from './referral.service';
 import { Wallet } from '../../wallets/wallet.entity';
 import { ReferralReward } from '../../referral-rewards/referral-reward.entity';
 import { ReferralClick } from '../../referral-clicks/referral-click.entity';
+import { SwapOrder } from '../../swap-orders/swap-order.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Wallet, ReferralReward, ReferralClick]),
+    TypeOrmModule.forFeature([Wallet, ReferralReward, ReferralClick, SwapOrder]),
   ],
   controllers: [ReferralController],
   providers: [ReferralService],
