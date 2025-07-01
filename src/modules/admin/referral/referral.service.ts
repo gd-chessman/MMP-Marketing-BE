@@ -108,7 +108,7 @@ export class ReferralService {
         sortKey = 'referrals_this_month';
         break;
       default:
-        sortKey = 'total_referrals';
+        sortKey = 'total_earnings_mmp';
         break;
     }
 
