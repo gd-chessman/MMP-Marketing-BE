@@ -29,10 +29,19 @@ export class WalletDetailStatisticsDto {
     total_pending_reward_mmp: number;
     total_wait_balance_reward_sol: number;
     total_wait_balance_reward_mmp: number;
+    total_reward_sol: number;
+    total_reward_mmp: number;
     total_clicks: number;
     clicks_today: number;
     clicks_this_week: number;
     clicks_this_month: number;
+    referred_by_info: {
+      wallet_id: number;
+      sol_address: string;
+      referral_code: string;
+      user_telegram_id: string;
+      user_email: string;
+    } | null;
   };
 
   // Thống kê Stake

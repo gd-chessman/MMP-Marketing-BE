@@ -344,6 +344,23 @@ export class WalletService {
       .select('SUM(reward.reward_amount)', 'total')
       .getRawOne();
 
+    // Tính tổng reward cho tất cả trạng thái
+    const totalRewardSOL = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status IN (:...statuses)', { statuses: ['paid', 'pending', 'wait_balance'] })
+      .andWhere('reward.reward_token = :token', { token: 'SOL' })
+      .select('SUM(reward.reward_amount)', 'total')
+      .getRawOne();
+
+    const totalRewardMMP = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status IN (:...statuses)', { statuses: ['paid', 'pending', 'wait_balance'] })
+      .andWhere('reward.reward_token = :token', { token: 'MMP' })
+      .select('SUM(reward.reward_amount)', 'total')
+      .getRawOne();
+
     // Thống kê click
     const clickStats = await this.referralClickRepository.findOne({
       where: { wallet_id: walletId }
@@ -370,6 +387,33 @@ export class WalletService {
       
       if (clickStats.last_click_at && new Date(clickStats.last_click_at) >= startOfMonth) {
         clicksThisMonth = clickStats.clicks_this_month;
+      }
+    }
+
+    // Thông tin người giới thiệu (nếu có)
+    let referredByInfo = null;
+    if (wallet.referred_by) {
+      const referrerWallet = await this.walletRepository
+        .createQueryBuilder('wallet')
+        .leftJoin('wallet.user', 'user')
+        .select([
+          'wallet.id',
+          'wallet.sol_address',
+          'wallet.referral_code',
+          'user.telegram_id',
+          'user.email'
+        ])
+        .where('wallet.referral_code = :referralCode', { referralCode: wallet.referred_by })
+        .getOne();
+
+      if (referrerWallet) {
+        referredByInfo = {
+          wallet_id: referrerWallet.id,
+          sol_address: referrerWallet.sol_address,
+          referral_code: referrerWallet.referral_code,
+          user_telegram_id: referrerWallet.user?.telegram_id,
+          user_email: referrerWallet.user?.email
+        };
       }
     }
 
@@ -433,10 +477,13 @@ export class WalletService {
         total_pending_reward_mmp: parseFloat(totalPendingRewardMMP?.total || '0'),
         total_wait_balance_reward_sol: parseFloat(totalWaitBalanceRewardSOL?.total || '0'),
         total_wait_balance_reward_mmp: parseFloat(totalWaitBalanceRewardMMP?.total || '0'),
+        total_reward_sol: parseFloat(totalRewardSOL?.total || '0'),
+        total_reward_mmp: parseFloat(totalRewardMMP?.total || '0'),
         total_clicks: totalClicks,
         clicks_today: clicksToday,
         clicks_this_week: clicksThisWeek,
         clicks_this_month: clicksThisMonth,
+        referred_by_info: referredByInfo,
       },
       
       stake_statistics: {
