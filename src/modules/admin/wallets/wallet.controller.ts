@@ -4,6 +4,7 @@ import { WalletService } from './wallet.service';
 import { UpdateWalletDto } from './dto/update-wallet.dto';
 import { SearchWalletsDto } from './dto/search-wallets.dto';
 import { WalletDetailStatisticsDto } from './dto/wallet-detail-statistics.dto';
+import { WalletListResponseDto } from './dto/wallet-response.dto';
 
 @Controller('admin/wallets')
 @UseGuards(JwtAdminGuard)
@@ -12,7 +13,7 @@ export class WalletController {
   constructor(private walletService: WalletService) {}
 
   @Get()
-  async getWallets(@Query() searchDto: SearchWalletsDto) {
+  async getWallets(@Query() searchDto: SearchWalletsDto): Promise<WalletListResponseDto> {
     const { page = 1, limit = 10, search, type, wallet_type } = searchDto;
     return this.walletService.findAll(page, limit, search, type, wallet_type);
   }

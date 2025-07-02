@@ -10,6 +10,7 @@ import { WalletStatisticsDto } from './dto/wallet-statistics.dto';
 import { ReferralStatisticsDto } from './dto/referral-statistics.dto';
 import { WalletTypeFilter } from './dto/search-wallets.dto';
 import { WalletDetailStatisticsDto } from './dto/wallet-detail-statistics.dto';
+import { WalletListResponseDto, WalletResponseDto } from './dto/wallet-response.dto';
 
 @Injectable()
 export class WalletService {
@@ -26,7 +27,7 @@ export class WalletService {
     private userStakeRepository: Repository<UserStake>,
   ) {}
 
-  async findAll(page = 1, limit = 10, search?: string, type?: string, wallet_type: WalletTypeFilter = WalletTypeFilter.ALL) {
+  async findAll(page = 1, limit = 10, search?: string, type?: string, wallet_type: WalletTypeFilter = WalletTypeFilter.ALL): Promise<WalletListResponseDto> {
     const skip = (page - 1) * limit;
     
     let queryBuilder = this.walletRepository
@@ -83,9 +84,50 @@ export class WalletService {
       .orderBy('wallet.created_at', 'DESC')
       .getManyAndCount();
 
+    // Tính toán thống kê swap cho từng ví
+    const walletsWithSwapStats: WalletResponseDto[] = [];
+    
+    for (const wallet of wallets) {
+      // Tính tổng MMP và MPB đã nhận từ swap
+      const swapStats = await this.swapOrderRepository
+        .createQueryBuilder('swap_order')
+        .where('swap_order.wallet_id = :walletId', { walletId: wallet.id })
+        .andWhere('swap_order.status = :status', { status: SwapOrderStatus.COMPLETED })
+        .select([
+          'SUM(swap_order.mmp_received) as total_mmp',
+          'SUM(swap_order.mpb_received) as total_mpb'
+        ])
+        .getRawOne();
+
+      const walletResponse: WalletResponseDto = {
+        id: wallet.id,
+        user_id: wallet.user_id,
+        sol_address: wallet.sol_address,
+        referral_code: wallet.referral_code,
+        wallet_type: wallet.wallet_type,
+        referred_by: wallet.referred_by,
+        created_at: wallet.created_at,
+        user: wallet.user ? {
+          id: wallet.user.id,
+          full_name: wallet.user.full_name,
+          email: wallet.user.email,
+          is_verified_email: wallet.user.is_verified_email,
+          is_verified_gg_auth: wallet.user.is_verified_gg_auth,
+          telegram_id: wallet.user.telegram_id,
+          created_at: wallet.user.created_at
+        } : null,
+        swap_statistics: {
+          total_mmp_received: parseFloat(swapStats?.total_mmp || '0'),
+          total_mpb_received: parseFloat(swapStats?.total_mpb || '0')
+        }
+      };
+
+      walletsWithSwapStats.push(walletResponse);
+    }
+
     return {
       status: true,
-      data: wallets,
+      data: walletsWithSwapStats,
       pagination: {
         page,
         limit,
