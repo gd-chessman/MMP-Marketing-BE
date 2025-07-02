@@ -2,15 +2,28 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Wallet } from '../../wallets/wallet.entity';
+import { SwapOrder, SwapOrderStatus, TokenType } from '../../swap-orders/swap-order.entity';
+import { ReferralReward } from '../../referral-rewards/referral-reward.entity';
+import { ReferralClick } from '../../referral-clicks/referral-click.entity';
+import { UserStake, UserStakeStatus } from '../../user-stakes/user-stake.entity';
 import { WalletStatisticsDto } from './dto/wallet-statistics.dto';
 import { ReferralStatisticsDto } from './dto/referral-statistics.dto';
 import { WalletTypeFilter } from './dto/search-wallets.dto';
+import { WalletDetailStatisticsDto } from './dto/wallet-detail-statistics.dto';
 
 @Injectable()
 export class WalletService {
   constructor(
     @InjectRepository(Wallet)
     private walletRepository: Repository<Wallet>,
+    @InjectRepository(SwapOrder)
+    private swapOrderRepository: Repository<SwapOrder>,
+    @InjectRepository(ReferralReward)
+    private referralRewardRepository: Repository<ReferralReward>,
+    @InjectRepository(ReferralClick)
+    private referralClickRepository: Repository<ReferralClick>,
+    @InjectRepository(UserStake)
+    private userStakeRepository: Repository<UserStake>,
   ) {}
 
   async findAll(page = 1, limit = 10, search?: string, type?: string, wallet_type: WalletTypeFilter = WalletTypeFilter.ALL) {
@@ -196,6 +209,244 @@ export class WalletService {
         user_telegram_id: w.user?.telegram_id,
         user_email: w.user?.email
       }))
+    };
+  }
+
+  async getWalletDetailStatistics(walletId: number): Promise<WalletDetailStatisticsDto> {
+    // Tìm ví theo ID
+    const wallet = await this.walletRepository.findOne({
+      where: { id: walletId }
+    });
+
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found');
+    }
+
+    // Tính toán thời gian
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1));
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    // === THỐNG KÊ SWAP ===
+    const swapStats = await this.swapOrderRepository
+      .createQueryBuilder('swap_order')
+      .where('swap_order.wallet_id = :walletId', { walletId })
+      .select([
+        'swap_order.status',
+        'swap_order.input_token',
+        'swap_order.input_amount',
+        'swap_order.mmp_received',
+        'swap_order.mpb_received'
+      ])
+      .getMany();
+
+    let totalSwapOrders = swapStats.length;
+    let completedSwaps = 0;
+    let pendingSwaps = 0;
+    let failedSwaps = 0;
+    let totalSolSwapped = 0;
+    let totalUsdtSwapped = 0;
+    let totalUsdcSwapped = 0;
+    let totalMmpReceived = 0;
+    let totalMpbReceived = 0;
+
+    swapStats.forEach(swap => {
+      if (swap.status === SwapOrderStatus.COMPLETED) {
+        completedSwaps++;
+      } else if (swap.status === SwapOrderStatus.PENDING) {
+        pendingSwaps++;
+      } else if (swap.status === SwapOrderStatus.FAILED) {
+        failedSwaps++;
+      }
+
+      if (swap.status === SwapOrderStatus.COMPLETED) {
+        if (swap.input_token === TokenType.SOL) {
+          totalSolSwapped += parseFloat(swap.input_amount.toString());
+        } else if (swap.input_token === TokenType.USDT) {
+          totalUsdtSwapped += parseFloat(swap.input_amount.toString());
+        } else if (swap.input_token === TokenType.USDC) {
+          totalUsdcSwapped += parseFloat(swap.input_amount.toString());
+        }
+
+        totalMmpReceived += parseFloat(swap.mmp_received?.toString() || '0');
+        totalMpbReceived += parseFloat(swap.mpb_received?.toString() || '0');
+      }
+    });
+
+    // === THỐNG KÊ REFERRAL ===
+    // Thống kê giới thiệu
+    const totalReferrals = await this.walletRepository
+      .createQueryBuilder('wallet')
+      .where('wallet.referred_by = :referralCode', { referralCode: wallet.referral_code })
+      .getCount();
+
+    const referralsThisMonth = await this.walletRepository
+      .createQueryBuilder('wallet')
+      .where('wallet.referred_by = :referralCode', { referralCode: wallet.referral_code })
+      .andWhere('wallet.created_at >= :startOfMonth', { startOfMonth })
+      .getCount();
+
+    const referralsThisWeek = await this.walletRepository
+      .createQueryBuilder('wallet')
+      .where('wallet.referred_by = :referralCode', { referralCode: wallet.referral_code })
+      .andWhere('wallet.created_at >= :startOfWeek', { startOfWeek })
+      .getCount();
+
+    // Thống kê thu nhập đã thanh toán
+    const totalEarningsSOL = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status = :status', { status: 'paid' })
+      .andWhere('reward.reward_token = :token', { token: 'SOL' })
+      .select('SUM(reward.reward_amount)', 'total')
+      .getRawOne();
+
+    const totalEarningsMMP = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status = :status', { status: 'paid' })
+      .andWhere('reward.reward_token = :token', { token: 'MMP' })
+      .select('SUM(reward.reward_amount)', 'total')
+      .getRawOne();
+
+    // Thống kê thu nhập đang chờ
+    const totalPendingRewardSOL = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status = :status', { status: 'pending' })
+      .andWhere('reward.reward_token = :token', { token: 'SOL' })
+      .select('SUM(reward.reward_amount)', 'total')
+      .getRawOne();
+
+    const totalPendingRewardMMP = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status = :status', { status: 'pending' })
+      .andWhere('reward.reward_token = :token', { token: 'MMP' })
+      .select('SUM(reward.reward_amount)', 'total')
+      .getRawOne();
+
+    const totalWaitBalanceRewardSOL = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status = :status', { status: 'wait_balance' })
+      .andWhere('reward.reward_token = :token', { token: 'SOL' })
+      .select('SUM(reward.reward_amount)', 'total')
+      .getRawOne();
+
+    const totalWaitBalanceRewardMMP = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status = :status', { status: 'wait_balance' })
+      .andWhere('reward.reward_token = :token', { token: 'MMP' })
+      .select('SUM(reward.reward_amount)', 'total')
+      .getRawOne();
+
+    // Thống kê click
+    const clickStats = await this.referralClickRepository.findOne({
+      where: { wallet_id: walletId }
+    });
+
+    let totalClicks = 0;
+    let clicksToday = 0;
+    let clicksThisWeek = 0;
+    let clicksThisMonth = 0;
+
+    if (clickStats) {
+      totalClicks = clickStats.total_clicks;
+      
+      // Tính click real-time
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      if (clickStats.last_click_at && new Date(clickStats.last_click_at) >= today) {
+        clicksToday = clickStats.clicks_today;
+      }
+      
+      if (clickStats.last_click_at && new Date(clickStats.last_click_at) >= startOfWeek) {
+        clicksThisWeek = clickStats.clicks_this_week;
+      }
+      
+      if (clickStats.last_click_at && new Date(clickStats.last_click_at) >= startOfMonth) {
+        clicksThisMonth = clickStats.clicks_this_month;
+      }
+    }
+
+    // === THỐNG KÊ STAKE ===
+    const stakeStats = await this.userStakeRepository
+      .createQueryBuilder('userStake')
+      .where('userStake.wallet_id = :walletId', { walletId })
+      .select([
+        'userStake.status',
+        'userStake.amount_staked',
+        'userStake.amount_claimed'
+      ])
+      .getMany();
+
+    let totalStakes = stakeStats.length;
+    let activeStakes = 0;
+    let completedStakes = 0;
+    let cancelledStakes = 0;
+    let totalAmountStaked = 0;
+    let totalAmountClaimed = 0;
+
+    stakeStats.forEach(stake => {
+      if (stake.status === UserStakeStatus.ACTIVE) {
+        activeStakes++;
+      } else if (stake.status === UserStakeStatus.COMPLETED) {
+        completedStakes++;
+      } else if (stake.status === UserStakeStatus.CANCELLED) {
+        cancelledStakes++;
+      }
+
+      totalAmountStaked += parseFloat(stake.amount_staked.toString());
+      totalAmountClaimed += parseFloat(stake.amount_claimed?.toString() || '0');
+    });
+
+    return {
+      wallet_id: wallet.id,
+      sol_address: wallet.sol_address,
+      referral_code: wallet.referral_code,
+      wallet_type: wallet.wallet_type,
+      created_at: wallet.created_at,
+      
+      swap_statistics: {
+        total_swap_orders: totalSwapOrders,
+        completed_swaps: completedSwaps,
+        pending_swaps: pendingSwaps,
+        failed_swaps: failedSwaps,
+        total_sol_swapped: totalSolSwapped,
+        total_usdt_swapped: totalUsdtSwapped,
+        total_usdc_swapped: totalUsdcSwapped,
+        total_mmp_received: totalMmpReceived,
+        total_mpb_received: totalMpbReceived,
+      },
+      
+      referral_statistics: {
+        total_referrals: totalReferrals,
+        referrals_this_month: referralsThisMonth,
+        referrals_this_week: referralsThisWeek,
+        total_earnings_sol: parseFloat(totalEarningsSOL?.total || '0'),
+        total_earnings_mmp: parseFloat(totalEarningsMMP?.total || '0'),
+        total_pending_reward_sol: parseFloat(totalPendingRewardSOL?.total || '0'),
+        total_pending_reward_mmp: parseFloat(totalPendingRewardMMP?.total || '0'),
+        total_wait_balance_reward_sol: parseFloat(totalWaitBalanceRewardSOL?.total || '0'),
+        total_wait_balance_reward_mmp: parseFloat(totalWaitBalanceRewardMMP?.total || '0'),
+        total_clicks: totalClicks,
+        clicks_today: clicksToday,
+        clicks_this_week: clicksThisWeek,
+        clicks_this_month: clicksThisMonth,
+      },
+      
+      stake_statistics: {
+        total_stakes: totalStakes,
+        active_stakes: activeStakes,
+        completed_stakes: completedStakes,
+        cancelled_stakes: cancelledStakes,
+        total_amount_staked: totalAmountStaked,
+        total_amount_claimed: totalAmountClaimed,
+      }
     };
   }
 }

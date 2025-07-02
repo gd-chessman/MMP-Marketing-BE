@@ -1,8 +1,9 @@
-import { Controller, Get, Post, UseGuards, Query, ClassSerializerInterceptor, UseInterceptors, Param, Body, Patch } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards, Query, ClassSerializerInterceptor, UseInterceptors, Param, Body, Patch, ParseIntPipe } from '@nestjs/common';
 import { JwtAdminGuard } from '../auth/jwt-admin.guard';
 import { WalletService } from './wallet.service';
 import { UpdateWalletDto } from './dto/update-wallet.dto';
 import { SearchWalletsDto } from './dto/search-wallets.dto';
+import { WalletDetailStatisticsDto } from './dto/wallet-detail-statistics.dto';
 
 @Controller('admin/wallets')
 @UseGuards(JwtAdminGuard)
@@ -19,6 +20,11 @@ export class WalletController {
   @Get('statistics')
   async getWalletStatistics() {
     return this.walletService.getStatistics();
+  }
+
+  @Get('statistics/:id')
+  async getWalletDetailStatistics(@Param('id', ParseIntPipe) id: number): Promise<WalletDetailStatisticsDto> {
+    return this.walletService.getWalletDetailStatistics(id);
   }
 
   @Get('referral-statistics/:id')
