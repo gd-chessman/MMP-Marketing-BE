@@ -8,7 +8,7 @@ import { ReferralClick } from '../../referral-clicks/referral-click.entity';
 import { UserStake, UserStakeStatus } from '../../user-stakes/user-stake.entity';
 import { WalletStatisticsDto } from './dto/wallet-statistics.dto';
 import { ReferralStatisticsDto } from './dto/referral-statistics.dto';
-import { WalletTypeFilter } from './dto/search-wallets.dto';
+import { WalletTypeFilter, SwapTokenSort, SortOrder } from './dto/search-wallets.dto';
 import { WalletDetailStatisticsDto } from './dto/wallet-detail-statistics.dto';
 import { WalletListResponseDto, WalletResponseDto } from './dto/wallet-response.dto';
 
@@ -27,7 +27,7 @@ export class WalletService {
     private userStakeRepository: Repository<UserStake>,
   ) {}
 
-  async findAll(page = 1, limit = 10, search?: string, type?: string, wallet_type: WalletTypeFilter = WalletTypeFilter.ALL): Promise<WalletListResponseDto> {
+  async findAll(page = 1, limit = 10, search?: string, type?: string, wallet_type: WalletTypeFilter = WalletTypeFilter.ALL, sort_by: SwapTokenSort = SwapTokenSort.CREATED_AT, sort_order: SortOrder = SortOrder.DESC): Promise<WalletListResponseDto> {
     const skip = (page - 1) * limit;
     
     let queryBuilder = this.walletRepository
@@ -78,10 +78,35 @@ export class WalletService {
       }
     }
 
+    // Sắp xếp theo created_at (mặc định)
+    if (sort_by === SwapTokenSort.CREATED_AT) {
+      queryBuilder = queryBuilder.orderBy('wallet.created_at', sort_order.toUpperCase() as 'ASC' | 'DESC');
+    }
+
+    // Sắp xếp theo MMP hoặc MPB - sử dụng subquery
+    if (sort_by === SwapTokenSort.MMP) {
+      queryBuilder = queryBuilder
+        .addSelect(`(
+          SELECT COALESCE(SUM(swap_order.mmp_received), 0)
+          FROM swap_orders swap_order
+          WHERE swap_order.wallet_id = wallet.id
+          AND swap_order.status = 'completed'
+        )`, 'total_mmp_received')
+        .orderBy('total_mmp_received', sort_order.toUpperCase() as 'ASC' | 'DESC');
+    } else if (sort_by === SwapTokenSort.MPB) {
+      queryBuilder = queryBuilder
+        .addSelect(`(
+          SELECT COALESCE(SUM(swap_order.mpb_received), 0)
+          FROM swap_orders swap_order
+          WHERE swap_order.wallet_id = wallet.id
+          AND swap_order.status = 'completed'
+        )`, 'total_mpb_received')
+        .orderBy('total_mpb_received', sort_order.toUpperCase() as 'ASC' | 'DESC');
+    }
+
     const [wallets, total] = await queryBuilder
       .skip(skip)
       .take(limit)
-      .orderBy('wallet.created_at', 'DESC')
       .getManyAndCount();
 
     // Tính toán thống kê swap cho từng ví

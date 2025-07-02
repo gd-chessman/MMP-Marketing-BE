@@ -14,8 +14,8 @@ export class WalletController {
 
   @Get()
   async getWallets(@Query() searchDto: SearchWalletsDto): Promise<WalletListResponseDto> {
-    const { page = 1, limit = 10, search, type, wallet_type } = searchDto;
-    return this.walletService.findAll(page, limit, search, type, wallet_type);
+    const { page = 1, limit = 10, search, type, wallet_type, sort_by, sort_order } = searchDto;
+    return this.walletService.findAll(page, limit, search, type, wallet_type, sort_by, sort_order);
   }
 
   @Get('statistics')
