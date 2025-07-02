@@ -1,6 +1,8 @@
 export class ReferralStatisticsDto {
   total_referrers: number;
   average_referrals_per_referrer: number;
+  total_reward_sol: number;
+  total_reward_mmp: number;
   top_referrer: {
     wallet_id: number;
     sol_address: string;

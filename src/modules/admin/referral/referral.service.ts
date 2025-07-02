@@ -205,9 +205,26 @@ export class ReferralService {
     // Tính trung bình
     const averageReferralsPerReferrer = totalReferrers > 0 ? totalReferrals / totalReferrers : 0;
 
+    // Tính tổng SOL và MMP đã thưởng (bao gồm paid, pending, wait_balance)
+    const totalRewardSOL = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.status IN (:...statuses)', { statuses: ['paid', 'pending', 'wait_balance'] })
+      .andWhere('reward.reward_token = :token', { token: 'SOL' })
+      .select('SUM(reward.reward_amount)', 'total')
+      .getRawOne();
+
+    const totalRewardMMP = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .where('reward.status IN (:...statuses)', { statuses: ['paid', 'pending', 'wait_balance'] })
+      .andWhere('reward.reward_token = :token', { token: 'MMP' })
+      .select('SUM(reward.reward_amount)', 'total')
+      .getRawOne();
+
     return {
       total_referrers: totalReferrers,
       average_referrals_per_referrer: Math.round(averageReferralsPerReferrer * 100) / 100, // Làm tròn 2 chữ số thập phân
+      total_reward_sol: parseFloat(totalRewardSOL?.total || '0'),
+      total_reward_mmp: parseFloat(totalRewardMMP?.total || '0'),
       top_referrer: topReferrer,
     };
   }
@@ -500,8 +517,6 @@ export class ReferralService {
         };
       }
     }
-
-
 
     return {
       wallet_id: wallet.id,
