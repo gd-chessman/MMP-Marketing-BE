@@ -136,13 +136,21 @@ export class StakeService {
       .select('SUM(COALESCE(userStake.amount_claimed, 0))', 'total')
       .getRawOne();
 
+    // Tổng số ví đang thực hiện stake (có ít nhất 1 stake active)
+    const totalWalletsStaking = await this.userStakeRepository
+      .createQueryBuilder('userStake')
+      .where('userStake.status = :status', { status: UserStakeStatus.ACTIVE })
+      .select('COUNT(DISTINCT userStake.wallet_id)', 'total')
+      .getRawOne();
+
     return {
       total_stakes: totalStakes,
       active_stakes: activeStakes,
       completed_stakes: completedStakes,
       cancelled_stakes: cancelledStakes,
       total_amount_staked: parseFloat(totalAmountStaked?.total || '0'),
-      total_amount_claimed: parseFloat(totalAmountClaimed?.total || '0')
+      total_amount_claimed: parseFloat(totalAmountClaimed?.total || '0'),
+      total_wallets_staking: parseInt(totalWalletsStaking?.total || '0')
     };
   }
 }

@@ -5,4 +5,5 @@ export class StakeStatisticsDto {
   cancelled_stakes: number;
   total_amount_staked: number;
   total_amount_claimed: number;
+  total_wallets_staking: number;
 } 
