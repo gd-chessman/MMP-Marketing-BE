@@ -157,23 +157,30 @@ export class SwapOrderService {
     const [data, total] = await queryBuilder.getManyAndCount();
 
     // Transform data
-    const transformedData: SwapOrderResponseDto[] = data.map(item => ({
-      id: item.id,
-      wallet_id: item.wallet_id,
-      wallet_address: item.wallet?.sol_address || '',
-      input_token: item.input_token,
-      output_token: item.output_token,
-      input_amount: parseFloat(item.input_amount.toString()),
-      mmp_received: parseFloat(item.mmp_received?.toString() || '0'),
-      mpb_received: parseFloat(item.mpb_received?.toString() || '0'),
-      swap_rate: parseFloat(item.swap_rate.toString()),
-      mmp_usd_price: parseFloat(item.mmp_usd_price?.toString() || '0'),
-      mpb_usd_price: parseFloat(item.mpb_usd_price?.toString() || '0'),
-      status: item.status,
-      tx_hash_send: item.tx_hash_send || '',
-      tx_hash_ref: item.tx_hash_ref || '',
-      created_at: item.created_at
-    }));
+    const transformedData: SwapOrderResponseDto[] = data.map(item => {
+      const mmpReceived = parseFloat(item.mmp_received?.toString() || '0');
+      const mpbReceived = parseFloat(item.mpb_received?.toString() || '0');
+      const mmpUsdPrice = parseFloat(item.mmp_usd_price?.toString() || '0');
+      const mpbUsdPrice = parseFloat(item.mpb_usd_price?.toString() || '0');
+
+      return {
+        id: item.id,
+        wallet_id: item.wallet_id,
+        wallet_address: item.wallet?.sol_address || '',
+        input_token: item.input_token,
+        output_token: item.output_token,
+        input_amount: parseFloat(item.input_amount.toString()),
+        mmp_received: mmpReceived,
+        mpb_received: mpbReceived,
+        swap_rate: parseFloat(item.swap_rate.toString()),
+        mmp_received_usd: mmpReceived * mmpUsdPrice,
+        mpb_received_usd: mpbReceived * mpbUsdPrice,
+        status: item.status,
+        tx_hash_send: item.tx_hash_send || '',
+        tx_hash_ref: item.tx_hash_ref || '',
+        created_at: item.created_at
+      };
+    });
 
     return {
       status: true,
