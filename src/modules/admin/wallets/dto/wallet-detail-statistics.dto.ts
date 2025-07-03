@@ -16,6 +16,8 @@ export class WalletDetailStatisticsDto {
     total_usdc_swapped: number;
     total_mmp_received: number;
     total_mpb_received: number;
+    total_mmp_received_usd: number;
+    total_mpb_received_usd: number;
   };
 
   // Thống kê Referral
@@ -25,6 +27,7 @@ export class WalletDetailStatisticsDto {
     referrals_this_week: number;
     total_earnings_sol: number;
     total_earnings_mmp: number;
+    total_earnings_mmp_usd: number;
     total_pending_reward_sol: number;
     total_pending_reward_mmp: number;
     total_wait_balance_reward_sol: number;

@@ -309,7 +309,9 @@ export class WalletService {
         'swap_order.input_token',
         'swap_order.input_amount',
         'swap_order.mmp_received',
-        'swap_order.mpb_received'
+        'swap_order.mpb_received',
+        'swap_order.mmp_usd_price',
+        'swap_order.mpb_usd_price'
       ])
       .getMany();
 
@@ -322,6 +324,8 @@ export class WalletService {
     let totalUsdcSwapped = 0;
     let totalMmpReceived = 0;
     let totalMpbReceived = 0;
+    let totalMmpReceivedUSD = 0;
+    let totalMpbReceivedUSD = 0;
 
     swapStats.forEach(swap => {
       if (swap.status === SwapOrderStatus.COMPLETED) {
@@ -343,6 +347,15 @@ export class WalletService {
 
         totalMmpReceived += parseFloat(swap.mmp_received?.toString() || '0');
         totalMpbReceived += parseFloat(swap.mpb_received?.toString() || '0');
+        
+        // Tính giá trị USD
+        if (swap.mmp_received && swap.mmp_usd_price) {
+          console.log(swap.mmp_received, swap.mmp_usd_price);
+          totalMmpReceivedUSD += parseFloat(swap.mmp_received.toString()) * parseFloat(swap.mmp_usd_price.toString());
+        }
+        if (swap.mpb_received && swap.mpb_usd_price) {
+          totalMpbReceivedUSD += parseFloat(swap.mpb_received.toString()) * parseFloat(swap.mpb_usd_price.toString());
+        }
       }
     });
 
@@ -430,6 +443,17 @@ export class WalletService {
       .andWhere('reward.status IN (:...statuses)', { statuses: ['paid', 'pending', 'wait_balance'] })
       .andWhere('reward.reward_token = :token', { token: 'MMP' })
       .select('SUM(reward.reward_amount)', 'total')
+      .getRawOne();
+
+    // Tính tổng giá trị USD của reward MMP đã thanh toán
+    const totalEarningsMMPUSD = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .leftJoin('reward.swap_order', 'swap_order')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status = :status', { status: 'paid' })
+      .andWhere('reward.reward_token = :token', { token: 'MMP' })
+      .andWhere('swap_order.mmp_usd_price IS NOT NULL')
+      .select('SUM(reward.reward_amount * swap_order.mmp_usd_price)', 'total')
       .getRawOne();
 
     // Thống kê click
@@ -536,6 +560,8 @@ export class WalletService {
         total_usdc_swapped: totalUsdcSwapped,
         total_mmp_received: totalMmpReceived,
         total_mpb_received: totalMpbReceived,
+        total_mmp_received_usd: totalMmpReceivedUSD,
+        total_mpb_received_usd: totalMpbReceivedUSD,
       },
       
       referral_statistics: {
@@ -544,6 +570,7 @@ export class WalletService {
         referrals_this_week: referralsThisWeek,
         total_earnings_sol: parseFloat(totalEarningsSOL?.total || '0'),
         total_earnings_mmp: parseFloat(totalEarningsMMP?.total || '0'),
+        total_earnings_mmp_usd: parseFloat(totalEarningsMMPUSD?.total || '0'),
         total_pending_reward_sol: parseFloat(totalPendingRewardSOL?.total || '0'),
         total_pending_reward_mmp: parseFloat(totalPendingRewardMMP?.total || '0'),
         total_wait_balance_reward_sol: parseFloat(totalWaitBalanceRewardSOL?.total || '0'),
