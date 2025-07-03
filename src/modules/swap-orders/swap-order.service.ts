@@ -29,11 +29,11 @@ export class SwapOrderService {
     [TokenType.USDC]: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
   };
 
-  // Giá MMP01 token (1 MMP01 = 0.001 $)
-  private readonly MMP01_PRICE_USD = 0.001;
+  // Giá MMP01 token từ environment
+  private readonly MMP01_PRICE_USD: number;
 
-  // Giá MPB token (1 MPB = 0.001 $)
-  private readonly MPB_PRICE_USD = 0.001;
+  // Giá MPB token từ environment
+  private readonly MPB_PRICE_USD: number;
 
   constructor(
     @InjectRepository(SwapOrder)
@@ -80,6 +80,21 @@ export class SwapOrderService {
       this.logger.error(`Failed to create MPB authority keypair: ${error.message}`);
       throw new InternalServerErrorException('Failed to initialize MPB authority keypair');
     }
+
+    // Khởi tạo giá token từ environment
+    const mmpPrice = this.configService.get<number>('MMP_USD_PRICE');
+    const mpbPrice = this.configService.get<number>('MPB_USD_PRICE');
+    
+    if (!mmpPrice || mmpPrice <= 0) {
+      throw new InternalServerErrorException('MMP_USD_PRICE is not configured or invalid');
+    }
+    
+    if (!mpbPrice || mpbPrice <= 0) {
+      throw new InternalServerErrorException('MPB_USD_PRICE is not configured or invalid');
+    }
+    
+    this.MMP01_PRICE_USD = mmpPrice;
+    this.MPB_PRICE_USD = mpbPrice;
   }
 
   /**
@@ -471,6 +486,8 @@ export class SwapOrderService {
         output_token: dto.output_token,
         input_amount: dto.input_amount,
         swap_rate: usdValue / dto.input_amount,
+        mmp_usd_price: this.MMP01_PRICE_USD,
+        mpb_usd_price: this.MPB_PRICE_USD,
         status: SwapOrderStatus.PENDING
       });
 
@@ -763,6 +780,8 @@ export class SwapOrderService {
         output_token: dto.outputToken,
         input_amount: dto.inputAmount,
         swap_rate: usdValue / dto.inputAmount,
+        mmp_usd_price: this.MMP01_PRICE_USD,
+        mpb_usd_price: this.MPB_PRICE_USD,
         status: SwapOrderStatus.PENDING
       });
 

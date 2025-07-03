@@ -57,6 +57,12 @@ export class SwapOrder {
   @Column({ type: 'decimal', precision: 20, scale: 8 })
   swap_rate: number;
 
+  @Column({ type: 'decimal', precision: 20, scale: 8, nullable: true })
+  mmp_usd_price: number;
+
+  @Column({ type: 'decimal', precision: 20, scale: 8, nullable: true })
+  mpb_usd_price: number;
+
   @Column({
     type: 'enum',
     enum: SwapOrderStatus,
