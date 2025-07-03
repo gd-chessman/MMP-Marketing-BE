@@ -120,7 +120,9 @@ export class WalletService {
         .andWhere('swap_order.status = :status', { status: SwapOrderStatus.COMPLETED })
         .select([
           'SUM(swap_order.mmp_received) as total_mmp',
-          'SUM(swap_order.mpb_received) as total_mpb'
+          'SUM(swap_order.mpb_received) as total_mpb',
+          'SUM(swap_order.mmp_received * swap_order.mmp_usd_price) as total_mmp_usd',
+          'SUM(swap_order.mpb_received * swap_order.mpb_usd_price) as total_mpb_usd'
         ])
         .getRawOne();
 
@@ -143,7 +145,9 @@ export class WalletService {
         } : null,
         swap_statistics: {
           total_mmp_received: parseFloat(swapStats?.total_mmp || '0'),
-          total_mpb_received: parseFloat(swapStats?.total_mpb || '0')
+          total_mpb_received: parseFloat(swapStats?.total_mpb || '0'),
+          total_mmp_received_usd: parseFloat(swapStats?.total_mmp_usd || '0'),
+          total_mpb_received_usd: parseFloat(swapStats?.total_mpb_usd || '0')
         }
       };
 

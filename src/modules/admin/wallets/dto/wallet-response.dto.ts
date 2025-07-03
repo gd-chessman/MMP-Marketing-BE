@@ -18,6 +18,8 @@ export class WalletResponseDto {
   swap_statistics: {
     total_mmp_received: number;
     total_mpb_received: number;
+    total_mmp_received_usd: number;
+    total_mpb_received_usd: number;
   };
 }
 
