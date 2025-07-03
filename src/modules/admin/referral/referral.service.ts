@@ -202,6 +202,17 @@ export class ReferralService {
             .select('SUM(reward.reward_amount)', 'total')
             .getRawOne();
 
+          // Tính tổng giá trị USD của thu nhập MMP của top referrer
+          const totalEarningsMMPUSD = await this.referralRewardRepository
+            .createQueryBuilder('reward')
+            .leftJoin('reward.swap_order', 'swap_order')
+            .where('reward.referrer_wallet_id = :walletId', { walletId: wallet.id })
+            .andWhere('reward.status = :status', { status: 'paid' })
+            .andWhere('reward.reward_token = :token', { token: 'MMP' })
+            .andWhere('swap_order.mmp_usd_price IS NOT NULL')
+            .select('SUM(reward.reward_amount * swap_order.mmp_usd_price)', 'total')
+            .getRawOne();
+
           topReferrer = {
             wallet_id: wallet.id,
             sol_address: wallet.sol_address,
@@ -209,6 +220,7 @@ export class ReferralService {
             total_referrals: referralCount,
             total_earnings_sol: parseFloat(totalEarningsSOL?.total || '0'),
             total_earnings_mmp: parseFloat(totalEarningsMMP?.total || '0'),
+            total_earnings_mmp_usd: parseFloat(totalEarningsMMPUSD?.total || '0'),
           };
         }
       }
@@ -232,11 +244,22 @@ export class ReferralService {
       .select('SUM(reward.reward_amount)', 'total')
       .getRawOne();
 
+    // Tính tổng giá trị USD của reward MMP
+    const totalRewardMMPUSD = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .leftJoin('reward.swap_order', 'swap_order')
+      .where('reward.status IN (:...statuses)', { statuses: ['paid', 'pending', 'wait_balance'] })
+      .andWhere('reward.reward_token = :token', { token: 'MMP' })
+      .andWhere('swap_order.mmp_usd_price IS NOT NULL')
+      .select('SUM(reward.reward_amount * swap_order.mmp_usd_price)', 'total')
+      .getRawOne();
+
     return {
       total_referrers: totalReferrers,
       average_referrals_per_referrer: Math.round(averageReferralsPerReferrer * 100) / 100, // Làm tròn 2 chữ số thập phân
       total_reward_sol: parseFloat(totalRewardSOL?.total || '0'),
       total_reward_mmp: parseFloat(totalRewardMMP?.total || '0'),
+      total_reward_mmp_usd: parseFloat(totalRewardMMPUSD?.total || '0'),
       top_referrer: topReferrer,
     };
   }

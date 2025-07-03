@@ -3,6 +3,7 @@ export class ReferralStatisticsDto {
   average_referrals_per_referrer: number;
   total_reward_sol: number;
   total_reward_mmp: number;
+  total_reward_mmp_usd: number;
   top_referrer: {
     wallet_id: number;
     sol_address: string;
@@ -10,6 +11,7 @@ export class ReferralStatisticsDto {
     total_referrals: number;
     total_earnings_sol: number;
     total_earnings_mmp: number;
+    total_earnings_mmp_usd: number;
   };
 }
 
