@@ -85,6 +85,17 @@ export class ReferralService {
         .select('SUM(reward.reward_amount)', 'total')
         .getRawOne();
 
+      // Tính tổng giá trị USD của thu nhập từ giới thiệu
+      const totalEarningsMMPUSD = await this.referralRewardRepository
+        .createQueryBuilder('reward')
+        .leftJoin('reward.swap_order', 'swap_order')
+        .where('reward.referrer_wallet_id = :walletId', { walletId: wallet.id })
+        .andWhere('reward.status IN (:...statuses)', { statuses: ['paid', 'pending', 'wait_balance'] })
+        .andWhere('reward.reward_token = :token', { token: 'MMP' })
+        .andWhere('swap_order.mmp_usd_price IS NOT NULL')
+        .select('SUM(reward.reward_amount * swap_order.mmp_usd_price)', 'total')
+        .getRawOne();
+
       allRankingData.push({
         wallet_id: wallet.id,
         sol_address: wallet.sol_address,
@@ -94,6 +105,7 @@ export class ReferralService {
         referrals_this_week: referralsThisWeek,
         total_earnings_sol: parseFloat(totalEarningsSOL?.total || '0'),
         total_earnings_mmp: parseFloat(totalEarningsMMP?.total || '0'),
+        total_earnings_mmp_usd: parseFloat(totalEarningsMMPUSD?.total || '0'),
         joined_date: wallet.created_at,
       });
     }

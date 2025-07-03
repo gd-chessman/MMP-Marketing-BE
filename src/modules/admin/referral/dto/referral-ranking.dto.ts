@@ -7,6 +7,7 @@ export class ReferralRankingDto {
   referrals_this_week: number;
   total_earnings_sol: number;
   total_earnings_mmp: number;
+  total_earnings_mmp_usd: number;
   joined_date: Date;
   rank?: number;
 }
