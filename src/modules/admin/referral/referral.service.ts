@@ -448,6 +448,17 @@ export class ReferralService {
       .select('SUM(reward.reward_amount)', 'total')
       .getRawOne();
 
+    // Tính tổng giá trị USD của thu nhập MMP đã thanh toán
+    const totalEarningsMMPUSD = await this.referralRewardRepository
+      .createQueryBuilder('reward')
+      .leftJoin('reward.swap_order', 'swap_order')
+      .where('reward.referrer_wallet_id = :walletId', { walletId })
+      .andWhere('reward.status = :status', { status: 'paid' })
+      .andWhere('reward.reward_token = :token', { token: 'MMP' })
+      .andWhere('swap_order.mmp_usd_price IS NOT NULL')
+      .select('SUM(reward.reward_amount * swap_order.mmp_usd_price)', 'total')
+      .getRawOne();
+
     // Thống kê thu nhập đang chờ
     const totalPendingRewardSOL = await this.referralRewardRepository
       .createQueryBuilder('reward')
@@ -545,6 +556,7 @@ export class ReferralService {
       // Thống kê thu nhập đã thanh toán
       total_earnings_sol: parseFloat(totalEarningsSOL?.total || '0'),
       total_earnings_mmp: parseFloat(totalEarningsMMP?.total || '0'),
+      total_earnings_mmp_usd: parseFloat(totalEarningsMMPUSD?.total || '0'),
       
       // Thống kê thu nhập đang chờ
       total_pending_reward_sol: parseFloat(totalPendingRewardSOL?.total || '0'),
@@ -603,6 +615,18 @@ export class ReferralService {
         .groupBy('reward.reward_token')
         .getRawMany();
 
+      // Tính tổng giá trị USD của reward MMP đã thanh toán
+      const totalRewardMMPUSD = await this.referralRewardRepository
+        .createQueryBuilder('reward')
+        .leftJoin('reward.swap_order', 'swap_order')
+        .where('reward.referrer_wallet_id = :walletId', { walletId })
+        .andWhere('reward.referred_wallet_id = :referredWalletId', { referredWalletId })
+        .andWhere('reward.status = :status', { status: 'paid' })
+        .andWhere('reward.reward_token = :token', { token: 'MMP' })
+        .andWhere('swap_order.mmp_usd_price IS NOT NULL')
+        .select('SUM(reward.reward_amount * swap_order.mmp_usd_price)', 'total')
+        .getRawOne();
+
       const pendingRewardStats = await this.referralRewardRepository
         .createQueryBuilder('reward')
         .where('reward.referrer_wallet_id = :walletId', { walletId })
@@ -615,6 +639,18 @@ export class ReferralService {
         .groupBy('reward.reward_token')
         .getRawMany();
 
+      // Tính tổng giá trị USD của reward MMP đang chờ
+      const pendingRewardMMPUSD = await this.referralRewardRepository
+        .createQueryBuilder('reward')
+        .leftJoin('reward.swap_order', 'swap_order')
+        .where('reward.referrer_wallet_id = :walletId', { walletId })
+        .andWhere('reward.referred_wallet_id = :referredWalletId', { referredWalletId })
+        .andWhere('reward.status = :status', { status: 'pending' })
+        .andWhere('reward.reward_token = :token', { token: 'MMP' })
+        .andWhere('swap_order.mmp_usd_price IS NOT NULL')
+        .select('SUM(reward.reward_amount * swap_order.mmp_usd_price)', 'total')
+        .getRawOne();
+
       const waitBalanceRewardStats = await this.referralRewardRepository
         .createQueryBuilder('reward')
         .where('reward.referrer_wallet_id = :walletId', { walletId })
@@ -626,6 +662,18 @@ export class ReferralService {
         ])
         .groupBy('reward.reward_token')
         .getRawMany();
+
+      // Tính tổng giá trị USD của reward MMP đang chờ balance
+      const waitBalanceRewardMMPUSD = await this.referralRewardRepository
+        .createQueryBuilder('reward')
+        .leftJoin('reward.swap_order', 'swap_order')
+        .where('reward.referrer_wallet_id = :walletId', { walletId })
+        .andWhere('reward.referred_wallet_id = :referredWalletId', { referredWalletId })
+        .andWhere('reward.status = :status', { status: 'wait_balance' })
+        .andWhere('reward.reward_token = :token', { token: 'MMP' })
+        .andWhere('swap_order.mmp_usd_price IS NOT NULL')
+        .select('SUM(reward.reward_amount * swap_order.mmp_usd_price)', 'total')
+        .getRawOne();
 
       // Tính toán các giá trị
       let totalRewardSol = 0;
@@ -677,10 +725,13 @@ export class ReferralService {
         created_at: walletData.created_at,
         total_reward_sol: totalRewardSol,
         total_reward_mmp: totalRewardMmp,
+        total_reward_mmp_usd: parseFloat(totalRewardMMPUSD?.total || '0'),
         pending_reward_sol: pendingRewardSol,
         pending_reward_mmp: pendingRewardMmp,
+        pending_reward_mmp_usd: parseFloat(pendingRewardMMPUSD?.total || '0'),
         wait_balance_reward_sol: waitBalanceRewardSol,
-        wait_balance_reward_mmp: waitBalanceRewardMmp
+        wait_balance_reward_mmp: waitBalanceRewardMmp,
+        wait_balance_reward_mmp_usd: parseFloat(waitBalanceRewardMMPUSD?.total || '0')
       });
     }
 

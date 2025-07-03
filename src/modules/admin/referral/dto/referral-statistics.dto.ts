@@ -28,6 +28,7 @@ export class WalletReferralStatisticsDto {
   // Thống kê thu nhập đã thanh toán
   total_earnings_sol: number;
   total_earnings_mmp: number;
+  total_earnings_mmp_usd: number;
   
   // Thống kê thu nhập đang chờ
   total_pending_reward_sol: number;
@@ -56,10 +57,13 @@ export class ReferredWalletDto {
   created_at: Date;
   total_reward_sol: number;
   total_reward_mmp: number;
+  total_reward_mmp_usd: number;
   pending_reward_sol: number;
   pending_reward_mmp: number;
+  pending_reward_mmp_usd: number;
   wait_balance_reward_sol: number;
   wait_balance_reward_mmp: number;
+  wait_balance_reward_mmp_usd: number;
 }
 
 export class ReferredWalletsResponseDto {
