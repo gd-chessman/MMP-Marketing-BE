@@ -8,6 +8,8 @@ export class SwapOrderResponseDto {
   mmp_received: number;
   mpb_received: number;
   swap_rate: number;
+  mmp_usd_price: number;
+  mpb_usd_price: number;
   status: string;
   tx_hash_send: string;
   tx_hash_ref: string;
