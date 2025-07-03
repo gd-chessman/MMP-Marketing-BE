@@ -68,6 +68,23 @@ export class SwapOrderService {
       .andWhere('swap_order.mpb_received IS NOT NULL')
       .getRawOne();
 
+    // Tính tổng giá trị USD của token nhận được
+    const mmpUsdStats = await this.swapOrderRepository
+      .createQueryBuilder('swap_order')
+      .select('SUM(swap_order.mmp_received * swap_order.mmp_usd_price)', 'total')
+      .where('swap_order.status = :status', { status: SwapOrderStatus.COMPLETED })
+      .andWhere('swap_order.mmp_received IS NOT NULL')
+      .andWhere('swap_order.mmp_usd_price IS NOT NULL')
+      .getRawOne();
+
+    const mpbUsdStats = await this.swapOrderRepository
+      .createQueryBuilder('swap_order')
+      .select('SUM(swap_order.mpb_received * swap_order.mpb_usd_price)', 'total')
+      .where('swap_order.status = :status', { status: SwapOrderStatus.COMPLETED })
+      .andWhere('swap_order.mpb_received IS NOT NULL')
+      .andWhere('swap_order.mpb_usd_price IS NOT NULL')
+      .getRawOne();
+
     return {
       total_swap_orders: totalSwapOrders,
       pending_orders: pendingOrders,
@@ -77,7 +94,9 @@ export class SwapOrderService {
       total_usdt_swapped: parseFloat(usdtStats?.total || '0'),
       total_usdc_swapped: parseFloat(usdcStats?.total || '0'),
       total_mmp_received: parseFloat(mmpStats?.total || '0'),
-      total_mpb_received: parseFloat(mpbStats?.total || '0')
+      total_mpb_received: parseFloat(mpbStats?.total || '0'),
+      total_mmp_received_usd: parseFloat(mmpUsdStats?.total || '0'),
+      total_mpb_received_usd: parseFloat(mpbUsdStats?.total || '0')
     };
   }
 

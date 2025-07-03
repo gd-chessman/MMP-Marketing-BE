@@ -15,4 +15,8 @@ export class SwapStatisticsDto {
   // Tổng token nhận được
   total_mmp_received: number;
   total_mpb_received: number;
+  
+  // Tổng giá trị USD của token nhận được
+  total_mmp_received_usd: number;
+  total_mpb_received_usd: number;
 } 
